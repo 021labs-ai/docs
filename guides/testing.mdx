@@ -1,0 +1,187 @@
+---
+title: Testing
+description: 'Write tests for LLM applications without making real API calls'
+---
+
+## Overview
+
+RDK provides several mechanisms for testing LLM applications:
+
+- `test_mode=True` — disables HTTP transport and mocks tool calls
+- `enabled=False` — disables tracing entirely
+- `capture_traces()` — captures spans in memory for assertions
+- `mock_tools()` — intercept specific tool calls with controlled responses
+
+## test_mode
+
+`test_mode=True` does two things:
+
+1. Sets `transport="null"` — no HTTP calls are made
+2. All tool calls return `"MOCKED"` by default
+
+```python
+from rdk import init
+
+init(
+    endpoint="https://placeholder",
+    api_key="test",
+    test_mode=True,
+)
+```
+
+Also reads from `RDK_TEST_MODE=1` environment variable.
+
+## enabled=False
+
+When you don't want any tracing at all:
+
+```python
+from rdk import init
+
+init(
+    endpoint="...",
+    api_key="...",
+    enabled=False,  # init() returns None, no instrumentation occurs
+)
+```
+
+## pytest fixture
+
+A standard fixture that initializes RDK in test mode and tears down after each test:
+
+```python
+# conftest.py
+import pytest
+from rdk import init, shutdown
+
+@pytest.fixture(autouse=True)
+def rdk():
+    init(
+        endpoint="https://placeholder",
+        api_key="test",
+        test_mode=True,
+    )
+    yield
+    shutdown()
+```
+
+## mock_tools()
+
+Override specific tool responses within a test:
+
+```python
+from rdk import mock_tools, observe, init
+from anthropic import Anthropic
+
+@observe()
+def weather_agent(question: str) -> str:
+    client = Anthropic()
+    # ... tool-calling loop with "get_weather" tool
+
+def test_weather_agent():
+    with mock_tools({"get_weather": "72°F, sunny in San Francisco"}):
+        result = weather_agent("What's the weather in SF?")
+    assert "72" in result
+```
+
+### Callable mock
+
+```python
+def test_search_tool():
+    with mock_tools({
+        "search": lambda args: f"Mocked results for: {args['query']}"
+    }):
+        result = my_agent("search for python")
+    assert "python" in result
+```
+
+### Error simulation
+
+```python
+def test_tool_failure_handling():
+    with mock_tools({"search": RuntimeError("Service down")}):
+        result = my_agent("search for something")
+    assert result == "Sorry, search is unavailable"
+```
+
+## capture_traces()
+
+Assert on the spans that were created during a function call:
+
+```python
+from rdk.testing import capture_traces
+from rdk import observe
+from anthropic import Anthropic
+
+@observe()
+def chat(message: str) -> str:
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=256,
+        messages=[{"role": "user", "content": message}],
+    )
+    return response.content[0].text
+
+def test_chat_creates_span():
+    with capture_traces() as spans:
+        chat("Hello")
+
+    assert len(spans) == 1
+    assert spans[0].name == "anthropic.messages.create"
+    assert spans[0].metadata["provider"] == "anthropic"
+```
+
+### Check token usage
+
+```python
+def test_token_usage_captured():
+    with capture_traces() as spans:
+        chat("Hello")
+
+    llm_span = spans[0]
+    assert llm_span.token_usage is not None
+    assert llm_span.token_usage.total_tokens > 0
+```
+
+## InMemoryTransport
+
+For lower-level assertions, use `InMemoryTransport` directly:
+
+```python
+from rdk import init
+from rdk.testing import InMemoryTransport
+
+def test_with_memory_transport():
+    transport = InMemoryTransport()
+    client = init(endpoint="...", api_key="test", test_mode=True)
+    client.set_transport(transport)
+
+    chat("Hello")
+    client.flush()
+
+    assert transport.sent_count == 1
+    assert len(transport.spans) == 1
+```
+
+## Environment variable approach
+
+Set `RDK_TEST_MODE=1` in your test environment to enable test mode without changing code:
+
+```bash
+# pytest.ini or pyproject.toml
+[pytest]
+env =
+    RDK_TEST_MODE=1
+```
+
+Or in a shell:
+
+```bash
+RDK_TEST_MODE=1 pytest
+```
+
+## See Also
+
+- [mock_tools()](/api-reference/mock-tools) — Full API reference
+- [init()](/api-reference/init) — `test_mode` and `enabled` parameters

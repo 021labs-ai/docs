@@ -21,18 +21,16 @@ from rdk import init, shutdown
 async def lifespan(app: FastAPI):
     # Startup
     init(
-        endpoint=os.environ.get("RDK_ENDPOINT"),
-        api_key=os.environ.get("RDK_API_KEY"),
+        endpoint=os.environ["RDK_ENDPOINT"],
+        api_key=os.environ["RDK_API_KEY"],
         batch_size=10,
         flush_interval=5.0,
     )
-    print("RDK initialized")
 
     yield  # App runs here
 
     # Shutdown
     shutdown()
-    print("RDK shutdown complete")
 
 app = FastAPI(title="My LLM API", lifespan=lifespan)
 ```
@@ -58,8 +56,8 @@ from rdk import flush, init, observe, shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init(
-        endpoint=os.environ.get("RDK_ENDPOINT"),
-        api_key=os.environ.get("RDK_API_KEY"),
+        endpoint=os.environ["RDK_ENDPOINT"],
+        api_key=os.environ["RDK_API_KEY"],
         batch_size=10,
         flush_interval=5.0,
     )
@@ -180,6 +178,7 @@ Add request IDs to traces for debugging:
 ```python
 import uuid
 from fastapi import Request
+from rdk import observe, get_current_trace_id
 
 @app.post("/chat")
 @observe(name="api-chat")
@@ -188,7 +187,8 @@ async def chat_with_request_id(
     body: ChatRequest
 ) -> ChatResponse:
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-    # Request ID is now associated with this trace
+    trace_id = get_current_trace_id()
+    # Correlate request_id with trace_id in logs
     ...
 ```
 
@@ -207,7 +207,6 @@ async def chat_endpoint(request: ChatRequest) -> ChatResponse:
         # Your logic
         ...
     except ValueError as e:
-        # Span is marked as ERROR with this message
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal error")
@@ -225,28 +224,37 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 uvicorn app:app --reload
 ```
 
+## Testing
+
+Disable tracing in tests using `test_mode=True` or `enabled=False`:
+
+```python
+import pytest
+from rdk import init, shutdown
+
+@pytest.fixture(autouse=True)
+def rdk_test():
+    init(
+        endpoint="https://placeholder",
+        api_key="test",
+        test_mode=True,   # No HTTP calls, tool calls return "MOCKED"
+    )
+    yield
+    shutdown()
+```
+
 ## Production Considerations
 
 <Warning>
 Always call `shutdown()` in your lifespan handler to flush pending traces before the app exits.
 </Warning>
 
-1. **Set appropriate batch size** - Higher values reduce network calls
-2. **Configure flush interval** - Balance latency vs. data freshness
-3. **Use PII redaction** - Required for compliance
-4. **Monitor flush endpoint** - Useful for debugging trace delivery
+1. **Set appropriate batch size** — Higher values reduce network calls
+2. **Configure flush interval** — Balance latency vs. data freshness
+3. **Use PII redaction** — Required for compliance
+4. **Monitor flush endpoint** — Useful for debugging trace delivery
 
-## Testing
+## See Also
 
-Disable tracing in tests:
-
-```python
-import os
-import pytest
-
-@pytest.fixture(autouse=True)
-def disable_rdk():
-    # Don't initialize RDK in tests
-    os.environ["RDK_DISABLED"] = "true"
-    yield
-```
+- [Testing Guide](/guides/testing) — Writing tests for LLM apps
+- [init()](/api-reference/init) — All configuration options

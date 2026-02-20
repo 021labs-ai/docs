@@ -64,17 +64,24 @@ baml-cli generate
 
 ## Basic Usage
 
+<Warning>
+BAML clients are code-generated per project and cannot be auto-instrumented. You **must** call `instrument_baml(b)` after `init()`, or BAML calls will not be traced.
+</Warning>
+
 ```python
 import os
 from baml_client import b
 from baml_client.types import CustomerInquiry
-from rdk import init, observe, shutdown
+from rdk import init, observe, instrument_baml, shutdown
 
-# Initialize RDK
+# 1. Initialize RDK
 init(
-    endpoint=os.environ.get("RDK_ENDPOINT"),
-    api_key=os.environ.get("RDK_API_KEY"),
+    endpoint=os.environ["RDK_ENDPOINT"],
+    api_key=os.environ["RDK_API_KEY"],
 )
+
+# 2. Wrap the BAML client — required for tracing
+b = instrument_baml(b)
 
 @observe(name="classify-inquiry")
 def classify(message: str) -> CustomerInquiry:
@@ -94,10 +101,15 @@ BAML async functions are fully supported:
 
 ```python
 import asyncio
+import os
 from baml_client import b
-from rdk import init, observe, shutdown
+from rdk import init, observe, instrument_baml, shutdown
 
-init(endpoint="...", api_key="...")
+init(
+    endpoint=os.environ["RDK_ENDPOINT"],
+    api_key=os.environ["RDK_API_KEY"],
+)
+b = instrument_baml(b)
 
 @observe(name="async-classify")
 async def async_classify(message: str):
@@ -136,10 +148,15 @@ function ExtractContact(text: string) -> Contact {
 ```
 
 ```python
+import os
 from baml_client import b
-from rdk import init, observe, shutdown
+from rdk import init, observe, instrument_baml, shutdown
 
-init(endpoint="...", api_key="...")
+init(
+    endpoint=os.environ["RDK_ENDPOINT"],
+    api_key=os.environ["RDK_API_KEY"],
+)
+b = instrument_baml(b)
 
 @observe(name="extract-contact")
 def extract_contact(text: str):
@@ -161,13 +178,12 @@ For each BAML call, RDK captures:
 
 | Field | Description |
 |-------|-------------|
-| `type` | LLM (BAML calls are LLM operations) |
+| `type` | `LLM` |
 | `model` | Model from BAML client config |
-| `input.function` | BAML function name |
 | `input.args` | Function arguments |
 | `output.result` | Structured result |
 | `token_usage` | Token counts |
-| `metadata.provider` | "baml" |
+| `metadata.provider` | `"baml"` |
 
 ## Error Handling
 
@@ -176,9 +192,13 @@ BAML provides validation errors for malformed responses:
 ```python
 from baml_client import b
 from baml_client.errors import BamlValidationError
-from rdk import init, observe, shutdown
+from rdk import init, observe, instrument_baml, shutdown
 
-init(endpoint="...", api_key="...")
+init(
+    endpoint=os.environ["RDK_ENDPOINT"],
+    api_key=os.environ["RDK_API_KEY"],
+)
+b = instrument_baml(b)
 
 @observe(name="safe-classify")
 def safe_classify(message: str):
@@ -192,12 +212,6 @@ result = safe_classify("Hello")
 shutdown()
 ```
 
-## Best Practices
+## See Also
 
-<Tip>
-BAML handles retries automatically. RDK captures each attempt as a separate span.
-</Tip>
-
-1. **Use precise types** - BAML validation catches errors early
-2. **Add descriptions** - Help the LLM understand field meanings
-3. **Handle errors** - Wrap calls in try/except for production
+- [instrument_baml()](/api-reference/instrument-baml) — API reference

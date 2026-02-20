@@ -12,10 +12,10 @@ RDK uses a hierarchical tracing model based on two core concepts:
 A **trace** represents a complete operation in your application, such as handling a user request or processing a task. Each trace has:
 
 - A unique ID
-- A name (from your `@observe` decorator)
+- A name (from your `@observe` decorator or `trace()` context manager)
 - A start time and optional end time
 - A collection of spans
-- Optional metadata (tags, user_id, session_id)
+- Optional metadata (tags, user_id, session_id, version)
 
 ### Spans
 
@@ -61,6 +61,10 @@ init(endpoint="...", api_key="...")
 
 This means you don't need to modify your existing LLM calls. RDK intercepts them and creates spans automatically.
 
+<Note>
+BAML is not auto-instrumented. You must call `b = instrument_baml(b)` after `init()`. See [BAML Integration](/integrations/baml).
+</Note>
+
 ### How It Works
 
 1. RDK patches the SDK's request methods
@@ -77,16 +81,15 @@ response = client.messages.create(
 )
 
 # But RDK has captured:
-# - Input messages
 # - Model and parameters
-# - Response content
 # - Token usage
 # - Duration
+# - Status
 ```
 
-## The @observe Decorator
+## Creating Traces
 
-The `@observe` decorator creates a trace context for your function:
+### With @observe (recommended for functions)
 
 ```python
 from rdk import observe
@@ -97,16 +100,46 @@ def my_function(input: str) -> str:
     ...
 ```
 
+### With trace() (for scripts and notebooks)
+
+```python
+from rdk import trace
+
+with trace("my-operation", tags=["dev"]) as t:
+    print(f"Trace ID: {t.id}")
+    # All LLM calls here are grouped into this trace
+```
+
 ### Decorator Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `name` | str | Name for the trace |
-| `trace_id` | str | Custom trace ID (optional) |
-| `tags` | list[str] | Tags to attach to spans |
-| `metadata` | dict | Custom metadata |
-| `user_id` | str | User identifier |
-| `session_id` | str | Session identifier |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | str | function name | Name for the trace |
+| `trace_id` | str or callable | auto-generated | Custom trace ID |
+| `tags` | list[str] | `[]` | Tags to attach to spans |
+| `metadata` | dict | `{}` | Custom metadata |
+| `user_id` | str or callable | None | User identifier |
+| `session_id` | str or callable | None | Session identifier |
+| `version` | str | None | Version string |
+| `capture_input` | bool | False | Store function args in metadata |
+| `capture_output` | bool | False | Store return value in metadata |
+
+## Manual Spans
+
+For custom code that isn't automatically captured, use `span()`:
+
+```python
+from rdk import observe, span
+from rdk.models import SpanType
+
+@observe()
+def pipeline(query: str):
+    with span("vector-search", span_type=SpanType.TOOL, input_data={"query": query}) as s:
+        results = vector_db.search(query)
+        s.metadata["result_count"] = len(results)
+```
+
+See [span()](/api-reference/span) and the [Manual Tracing](/features/manual-tracing) guide.
 
 ## Batching and Transport
 

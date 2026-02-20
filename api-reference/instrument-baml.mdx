@@ -1,0 +1,72 @@
+---
+title: instrument_baml()
+description: 'Wrap a BAML client with automatic tracing'
+---
+
+## Signature
+
+```python
+def instrument_baml(baml_client: Any) -> Any
+```
+
+## Overview
+
+Unlike Anthropic, OpenAI, LangChain, and Gemini — which are auto-instrumented when `init()` is called — BAML clients are code-generated per project and cannot be monkey-patched. You must explicitly wrap the client with `instrument_baml()` after calling `init()`.
+
+<Warning>
+If you use BAML without calling `instrument_baml()`, calls will **not** be traced, even if `init()` was called. There is no error — they simply won't appear in traces.
+</Warning>
+
+## Parameters
+
+<ParamField path="baml_client" type="Any" required>
+  The BAML client instance to wrap. Typically imported as `b` from `baml_client`.
+</ParamField>
+
+## Returns
+
+A proxy-wrapped client with tracing enabled. Assign the result back to your client variable.
+
+## Example
+
+```python
+from baml_client import b
+from rdk import init, observe, instrument_baml
+
+init(
+    endpoint="https://collector.021labs.ai",
+    api_key="your-api-key",
+)
+
+# Required: wrap the BAML client after init()
+b = instrument_baml(b)
+
+@observe(name="extract-entities")
+async def process(text: str):
+    return await b.ExtractEntities(text)  # Auto-traced!
+```
+
+## How It Works
+
+`instrument_baml()` wraps the BAML client in a proxy that intercepts method calls. When a BAML function is called:
+
+1. The proxy detects the active trace (from `@observe` or `trace()`)
+2. A span is created with the function name and arguments
+3. The real BAML function executes normally
+4. The span is completed with the structured result and token usage
+
+## What Gets Captured
+
+| Field | Description |
+|-------|-------------|
+| `type` | `LLM` |
+| `name` | BAML function name (e.g., `baml.ClassifyInquiry`) |
+| `input.args` | Function arguments |
+| `output.result` | Structured result |
+| `token_usage` | Token counts |
+| `metadata.provider` | `"baml"` |
+
+## See Also
+
+- [BAML Integration](/integrations/baml) — Full setup guide
+- [@observe](/api-reference/observe) — Create a trace context

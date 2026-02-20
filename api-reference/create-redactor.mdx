@@ -1,0 +1,86 @@
+---
+title: create_redactor()
+description: 'Build a reusable PII redaction function from RedactorConfig'
+---
+
+## Functions
+
+### `create_redactor()`
+
+```python
+def create_redactor(config: RedactorConfig) -> Callable[[Any], Any]
+```
+
+Builds a redactor function from a `RedactorConfig`. The returned callable recursively redacts strings in any value (strings, dicts, lists, tuples).
+
+### `create_default_redactor()`
+
+```python
+def create_default_redactor() -> Callable[[Any], Any]
+```
+
+Equivalent to `create_redactor(RedactorConfig())` — returns a redactor with all default patterns enabled.
+
+## Parameters
+
+<ParamField path="config" type="RedactorConfig" required>
+  Configuration specifying which patterns to apply.
+</ParamField>
+
+## Returns
+
+A callable `(value: Any) -> Any` that recursively redacts PII. Safe to call on strings, dicts, lists, or nested structures.
+
+## Examples
+
+### Build and pass to init()
+
+```python
+import re
+from rdk import RedactorConfig, create_redactor, init
+
+redactor = create_redactor(RedactorConfig(
+    redact_emails=True,
+    redact_phones=True,
+    custom_patterns=[
+        (re.compile(r"ACC-\d{8}"), "[ACCOUNT REDACTED]"),
+    ],
+))
+
+init(
+    endpoint="...",
+    api_key="...",
+    redactor=redactor,
+)
+```
+
+### Standalone use
+
+```python
+from rdk import create_redactor, RedactorConfig
+
+redactor = create_redactor(RedactorConfig(redact_emails=True, redact_phones=False))
+
+clean = redactor({
+    "user": "john@example.com",
+    "phone": "555-123-4567",
+    "note": "Contact john@example.com for details",
+})
+# {"user": "[EMAIL REDACTED]", "phone": "555-123-4567", "note": "Contact [EMAIL REDACTED] for details"}
+```
+
+### Default redactor
+
+```python
+from rdk.filters import create_default_redactor
+
+redactor = create_default_redactor()
+clean = redactor("Call 555-123-4567 or email me at john@example.com")
+# "Call [PHONE REDACTED] or email me at [EMAIL REDACTED]"
+```
+
+## See Also
+
+- [RedactorConfig](/api-reference/redactor-config) — Configuration reference
+- [redact_all_pii()](/api-reference/redact-all-pii) — One-shot redaction
+- [PII Redaction guide](/features/pii-redaction) — Overview

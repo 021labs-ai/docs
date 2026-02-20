@@ -1,0 +1,130 @@
+---
+title: span()
+description: 'Context manager to trace custom code blocks'
+---
+
+## Signature
+
+```python
+@contextmanager
+def span(
+    name: str,
+    span_type: SpanType = SpanType.CHAIN,
+    input_data: dict | None = None,
+    metadata: dict | None = None,
+) -> Generator[Span, None, None]
+```
+
+## Overview
+
+`span()` creates a manual span within an active trace. Use it to trace custom operations — database queries, API calls, business logic — that aren't automatically captured by SDK instrumentation.
+
+Must be called inside an `@observe`-decorated function or a `trace()` context manager. If no active trace exists, `span()` yields a no-op dummy span that does nothing.
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  Name of the span. Use descriptive names like `"vector-search"` or `"database.query.customers"`.
+</ParamField>
+
+<ParamField path="span_type" type="SpanType" default="SpanType.CHAIN">
+  Type of operation. Choose the most specific type:
+
+  | Value | Use Case |
+  |-------|----------|
+  | `SpanType.LLM` | Language model calls |
+  | `SpanType.CHAIN` | Orchestration / workflow logic |
+  | `SpanType.TOOL` | External tool or API calls |
+  | `SpanType.FUNCTION` | Internal functions or business logic |
+</ParamField>
+
+<ParamField path="input_data" type="dict" default="{}">
+  Input data to record with the span.
+</ParamField>
+
+<ParamField path="metadata" type="dict" default="{}">
+  Additional metadata to attach to the span.
+</ParamField>
+
+## Yields
+
+A `Span` object. You can write to `s.metadata` inside the block to attach data discovered during execution.
+
+## Behavior
+
+- On normal exit: span is marked `SUCCESS`
+- On exception: span is marked `ERROR` with the exception message, then the exception re-raises
+- After the block: span is queued for sending
+
+## Examples
+
+### Basic custom span
+
+```python
+from rdk import observe, span
+
+@observe()
+def pipeline(query: str):
+    with span("vector-search", input_data={"query": query}) as s:
+        results = my_vector_db.search(query)
+        s.metadata["result_count"] = len(results)
+    return results
+```
+
+### Tool span
+
+```python
+from rdk import observe, span
+from rdk.models import SpanType
+
+@observe()
+def agent_step(tool_name: str, args: dict) -> str:
+    with span(f"tool.{tool_name}", span_type=SpanType.TOOL, input_data=args) as s:
+        result = execute_tool(tool_name, args)
+        s.metadata["output"] = result
+    return result
+```
+
+### Database query
+
+```python
+from rdk import observe, span
+from rdk.models import SpanType
+
+@observe()
+def lookup_customer(email: str) -> dict:
+    with span("db.customers.find", span_type=SpanType.FUNCTION, input_data={"email": email}) as s:
+        customer = db.find_by_email(email)
+        s.metadata["found"] = customer is not None
+    return customer
+```
+
+### Combining with LLM calls
+
+```python
+from rdk import observe, span
+from rdk.models import SpanType
+from anthropic import Anthropic
+
+@observe(name="customer-lookup")
+def lookup_and_summarize(email: str) -> dict:
+    # Manual span for DB
+    with span("db.query", span_type=SpanType.FUNCTION, input_data={"email": email}) as s:
+        customer = db.find_by_email(email)
+        s.metadata["found"] = customer is not None
+
+    # LLM call is auto-traced
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=256,
+        messages=[{"role": "user", "content": f"Summarize: {customer}"}]
+    )
+    return response.content[0].text
+```
+
+## See Also
+
+- [@observe](/api-reference/observe) — Create a trace context
+- [trace()](/api-reference/trace) — Context manager trace creation
+- [Manual Tracing](/features/manual-tracing) — Full guide

@@ -20,10 +20,10 @@ Building LLM applications requires understanding what's happening under the hood
 
 <CardGroup cols={2}>
   <Card title="Auto-instrumentation" icon="wand-magic-sparkles">
-    Automatic tracing for Anthropic, OpenAI, LangChain, Gemini, and BAML
+    Automatic tracing for Anthropic, OpenAI, LangChain, and Gemini SDKs
   </Card>
   <Card title="PII Redaction" icon="shield-halved">
-    Built-in redaction for emails, phone numbers, SSNs, and custom patterns
+    Built-in redaction for emails, phone numbers, SSNs, API keys, and custom patterns
   </Card>
   <Card title="Minimal Overhead" icon="gauge-high">
     Async batching with configurable flush intervals
@@ -35,13 +35,13 @@ Building LLM applications requires understanding what's happening under the hood
 
 ## Supported Integrations
 
-| Provider | Auto-instrumentation | Tool Calls | Streaming |
-|----------|---------------------|------------|-----------|
-| Anthropic | Yes | Yes | Coming Soon |
-| OpenAI | Yes | Yes | Coming Soon |
-| LangChain | Yes | Yes | Yes |
-| Google Gemini | Yes | Yes | Coming Soon |
-| BAML | Yes | Yes | N/A |
+| Provider | Auto-instrumentation | Notes |
+|----------|---------------------|-------|
+| Anthropic | Yes | Auto-instrumented at `init()` |
+| OpenAI | Yes | Auto-instrumented at `init()` |
+| LangChain | Yes | Auto-instrumented at `init()` |
+| Google Gemini | Yes | Auto-instrumented at `init()` |
+| BAML | Manual | Requires `b = instrument_baml(b)` after `init()` |
 
 ## Quick Example
 

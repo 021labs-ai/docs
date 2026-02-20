@@ -1,0 +1,112 @@
+---
+title: trace()
+description: 'Context manager alternative to @observe'
+---
+
+## Signature
+
+```python
+@contextmanager
+def trace(
+    name: str,
+    tags: list[str] | None = None,
+    metadata: dict | None = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    version: str | None = None,
+    trace_id: str | None = None,
+) -> Generator[Trace, None, None]
+```
+
+## Overview
+
+`trace()` is a context manager that creates a trace, identical to `@observe` but useful when decorators aren't convenient — Jupyter notebooks, scripts, or one-off operations.
+
+All LLM calls made inside the `with` block are automatically captured and associated with the trace.
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  Name for the trace.
+</ParamField>
+
+<ParamField path="tags" type="list[string]" default="[]">
+  Tags for categorization.
+</ParamField>
+
+<ParamField path="metadata" type="dict" default="{}">
+  Custom key-value pairs attached to the trace.
+</ParamField>
+
+<ParamField path="user_id" type="string" default="None">
+  User identifier.
+</ParamField>
+
+<ParamField path="session_id" type="string" default="None">
+  Session identifier.
+</ParamField>
+
+<ParamField path="version" type="string" default="None">
+  Version string stored in trace metadata.
+</ParamField>
+
+<ParamField path="trace_id" type="string" default="auto-generated">
+  Explicit trace ID. A UUID is generated if not provided.
+</ParamField>
+
+## Yields
+
+A `Trace` object. You can read `t.id` to correlate the trace with logs.
+
+## Example
+
+### Basic
+
+```python
+from rdk import trace
+from anthropic import Anthropic
+
+with trace("notebook-experiment", tags=["dev"]) as t:
+    print(f"Trace ID: {t.id}")
+    client = Anthropic()
+    result = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=256,
+        messages=[{"role": "user", "content": "Hello"}]
+    )
+```
+
+### With metadata
+
+```python
+from rdk import trace
+
+with trace(
+    "batch-job",
+    tags=["batch"],
+    metadata={"job_id": job_id, "dataset": "q4-2024"},
+    user_id="system",
+) as t:
+    # process items
+    ...
+    print(f"Completed trace: {t.id}")
+```
+
+### Correlating with logs
+
+```python
+import logging
+from rdk import trace
+
+logger = logging.getLogger(__name__)
+
+with trace("process-document") as t:
+    logger.info("Processing", extra={"trace_id": t.id})
+    # LLM calls here are captured
+```
+
+## See Also
+
+- [@observe](/api-reference/observe) — Decorator equivalent (preferred for production functions)
+- [span()](/api-reference/span) — Create manual spans within a trace
+- [get_current_trace()](/api-reference/get-current-trace) — Access the active trace

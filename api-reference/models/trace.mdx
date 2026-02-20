@@ -16,6 +16,7 @@ class Trace(CamelModel):
     metadata: dict
     user_id: str | None
     session_id: str | None
+    version: str | None  # stored in metadata["version"]
 ```
 
 ## Fields
@@ -45,7 +46,7 @@ class Trace(CamelModel):
 </ParamField>
 
 <ParamField path="metadata" type="dict">
-  Arbitrary metadata attached to the trace.
+  Arbitrary metadata attached to the trace. The `version` field from `@observe` is stored here as `metadata["version"]`.
 </ParamField>
 
 <ParamField path="user_id" type="string">
@@ -55,28 +56,6 @@ class Trace(CamelModel):
 <ParamField path="session_id" type="string">
   Optional session identifier.
 </ParamField>
-
-## Example
-
-```python
-from rdk.models import Trace, Span, SpanType
-
-trace = Trace(
-    name="customer-support",
-    tags=["production"],
-    metadata={"channel": "web"},
-    user_id="user_123",
-    session_id="session_abc"
-)
-
-# Add spans
-span = Span(
-    trace_id=trace.id,
-    name="llm-call",
-    type=SpanType.LLM
-)
-trace.spans.append(span)
-```
 
 ## JSON Serialization
 
@@ -90,7 +69,7 @@ Traces serialize with camelCase field names:
   "startTime": 1708444800000,
   "endTime": null,
   "tags": ["production"],
-  "metadata": {"channel": "web"},
+  "metadata": {"channel": "web", "version": "2.1.0"},
   "userId": "user_123",
   "sessionId": "session_abc"
 }
@@ -98,5 +77,5 @@ Traces serialize with camelCase field names:
 
 ## See Also
 
-- [Span](/api-reference/models/span) - Individual operations
-- [Core Concepts](/concepts) - Understanding traces
+- [Span](/api-reference/models/span) — Individual operations
+- [Core Concepts](/concepts) — Understanding traces

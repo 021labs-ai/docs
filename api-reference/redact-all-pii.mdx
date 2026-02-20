@@ -1,0 +1,67 @@
+---
+title: redact_all_pii()
+description: 'One-shot PII redaction using all default patterns'
+---
+
+## Signature
+
+```python
+def redact_all_pii(value: Any) -> Any
+```
+
+## Overview
+
+`redact_all_pii()` applies all built-in PII redaction patterns to a value in one call. It's equivalent to `create_default_redactor()(value)`.
+
+Use this for sanitizing individual values outside of trace context — for example, before logging or storing data.
+
+For repeated use, prefer `create_redactor()` which builds the redactor once and reuses it.
+
+## Parameters
+
+<ParamField path="value" type="Any" required>
+  The value to redact. Can be a string, dict, list, tuple, or nested combination.
+</ParamField>
+
+## Returns
+
+The redacted value with the same structure as the input.
+
+## Patterns Applied
+
+| Type | Replacement |
+|------|-------------|
+| Email | `[EMAIL REDACTED]` |
+| Phone | `[PHONE REDACTED]` |
+| SSN | `[SSN REDACTED]` |
+| Credit Card | `[CARD REDACTED]` |
+| API Key | `[API_KEY REDACTED]` |
+
+## Examples
+
+```python
+from rdk import redact_all_pii
+
+# String
+clean = redact_all_pii("Call 555-123-4567 or john@example.com")
+# "Call [PHONE REDACTED] or [EMAIL REDACTED]"
+
+# Dict
+clean = redact_all_pii({
+    "email": "john@example.com",
+    "message": "My SSN is 123-45-6789",
+})
+# {"email": "[EMAIL REDACTED]", "message": "My SSN is [SSN REDACTED]"}
+
+# Nested list
+clean = redact_all_pii([
+    {"role": "user", "content": "My card is 4111-1111-1111-1111"},
+])
+# [{"role": "user", "content": "My card is [CARD REDACTED]"}]
+```
+
+## See Also
+
+- [create_redactor()](/api-reference/create-redactor) — Build a reusable redactor
+- [RedactorConfig](/api-reference/redactor-config) — Custom configuration
+- [PII Redaction guide](/features/pii-redaction) — Full guide

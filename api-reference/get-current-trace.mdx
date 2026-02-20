@@ -1,0 +1,85 @@
+---
+title: get_current_trace()
+description: 'Access the active trace from within a traced function'
+---
+
+## Functions
+
+### `get_current_trace()`
+
+```python
+def get_current_trace() -> Trace | None
+```
+
+Returns the currently active `Trace` object, or `None` if called outside a trace context.
+
+### `get_current_trace_id()`
+
+```python
+def get_current_trace_id() -> str | None
+```
+
+Shorthand for `get_current_trace().id`. Returns the active trace ID string, or `None`.
+
+## Use Cases
+
+Both functions are useful for correlating RDK traces with your application logs, metrics, or external systems.
+
+## Examples
+
+### Log correlation
+
+```python
+import logging
+from rdk import observe, get_current_trace_id
+
+logger = logging.getLogger(__name__)
+
+@observe()
+def process(query: str):
+    trace_id = get_current_trace_id()
+    logger.info("Processing query", extra={"trace_id": trace_id, "query": query})
+    # LLM calls here
+```
+
+### Attach trace ID to response headers
+
+```python
+from fastapi import Response
+from rdk import observe, get_current_trace_id
+
+@app.post("/chat")
+@observe(name="api-chat")
+async def chat(request: ChatRequest, response: Response):
+    trace_id = get_current_trace_id()
+    if trace_id:
+        response.headers["X-Trace-ID"] = trace_id
+    # LLM calls here
+```
+
+### Read trace fields
+
+```python
+from rdk import observe, get_current_trace
+
+@observe(name="pipeline", user_id="user_123", tags=["prod"])
+def pipeline(query: str):
+    t = get_current_trace()
+    if t:
+        print(f"Trace: {t.id}, user: {t.user_id}, tags: {t.tags}")
+```
+
+### Outside a trace
+
+```python
+from rdk import get_current_trace
+
+t = get_current_trace()
+print(t)  # None — no active trace
+```
+
+## See Also
+
+- [@observe](/api-reference/observe) — Create a trace context
+- [trace()](/api-reference/trace) — Context manager trace creation
+- [Trace model](/api-reference/models/trace) — Trace fields

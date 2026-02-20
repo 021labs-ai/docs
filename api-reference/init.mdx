@@ -11,8 +11,20 @@ def init(
     api_key: str,
     batch_size: int = 10,
     flush_interval: float = 5.0,
-    redactor_config: RedactorConfig | None = None,
-) -> None
+    timeout: float = 30.0,
+    sample_rate: float = 1.0,
+    redact_pii: bool = False,
+    redactor: Callable[[Any], Any] | None = None,
+    debug: bool = False,
+    enabled: bool = True,
+    on_error: Callable[[Exception], None] | None = None,
+    instrument_langchain: bool = True,
+    instrument_anthropic: bool = True,
+    instrument_openai: bool = True,
+    instrument_gemini: bool = True,
+    transport: str | None = None,
+    test_mode: bool | None = None,
+) -> RDK | None
 ```
 
 ## Parameters
@@ -31,38 +43,117 @@ def init(
 
 <ParamField path="batch_size" type="integer" default={10}>
   Maximum number of spans to batch before sending.
-
-  Higher values reduce network calls but increase memory usage.
 </ParamField>
 
 <ParamField path="flush_interval" type="float" default={5.0}>
   Maximum seconds between automatic flushes.
-
-  Lower values provide fresher data but more network overhead.
 </ParamField>
 
-<ParamField path="redactor_config" type="RedactorConfig" default="None">
-  Configuration for PII redaction.
-
-  See [PII Redaction](/features/pii-redaction) for details.
+<ParamField path="timeout" type="float" default={30.0}>
+  HTTP request timeout in seconds.
 </ParamField>
 
-## Example
+<ParamField path="sample_rate" type="float" default={1.0}>
+  Fraction of traces to capture (0.0 to 1.0). `1.0` captures all traces.
+
+  Example: `0.1` captures 10% of traces.
+</ParamField>
+
+<ParamField path="redact_pii" type="boolean" default={false}>
+  If `True`, automatically redact common PII patterns (emails, phones, SSNs, credit cards, API keys) before sending traces.
+
+  For custom redaction, use `redactor` instead.
+</ParamField>
+
+<ParamField path="redactor" type="Callable[[Any], Any]" default="None">
+  Custom redaction function applied to span inputs and outputs before sending.
+
+  Use `create_redactor(RedactorConfig(...))` to build one. Takes precedence over `redact_pii`.
+</ParamField>
+
+<ParamField path="debug" type="boolean" default={false}>
+  If `True`, enable verbose debug logging via the `rdk` logger.
+</ParamField>
+
+<ParamField path="enabled" type="boolean" default={true}>
+  If `False`, tracing is completely disabled and `init()` returns `None`. No SDK instrumentation occurs.
+
+  Useful for disabling tracing in test environments without changing other code.
+</ParamField>
+
+<ParamField path="on_error" type="Callable[[Exception], None]" default="None">
+  Callback invoked when a transport error occurs. Use this for alerting or logging.
+
+  Example: `lambda e: logger.error(f"RDK error: {e}")`
+</ParamField>
+
+<ParamField path="instrument_langchain" type="boolean" default={true}>
+  If `True`, auto-instrument LangChain calls.
+</ParamField>
+
+<ParamField path="instrument_anthropic" type="boolean" default={true}>
+  If `True`, auto-instrument Anthropic SDK calls.
+</ParamField>
+
+<ParamField path="instrument_openai" type="boolean" default={true}>
+  If `True`, auto-instrument OpenAI SDK calls.
+</ParamField>
+
+<ParamField path="instrument_gemini" type="boolean" default={true}>
+  If `True`, auto-instrument Google Gemini SDK calls.
+</ParamField>
+
+<ParamField path="transport" type="string" default="\"http\"">
+  Transport backend. `"http"` sends to the collector endpoint; `"null"` discards all spans (useful for tests).
+</ParamField>
+
+<ParamField path="test_mode" type="boolean" default="None">
+  If `True`, sets `transport="null"` and configures default tool mocks. Also reads from the `RDK_TEST_MODE` environment variable (`1`, `true`, `yes`).
+</ParamField>
+
+## Returns
+
+The initialized `RDK` client instance, or `None` if `enabled=False`.
+
+## Examples
+
+### Production
 
 ```python
 import os
 from rdk import init
-from rdk.redactor import RedactorConfig
 
 init(
-    endpoint=os.environ.get("RDK_ENDPOINT", "https://collector.021labs.ai"),
-    api_key=os.environ.get("RDK_API_KEY"),
-    batch_size=20,
-    flush_interval=10.0,
-    redactor_config=RedactorConfig(
-        redact_emails=True,
-        redact_phone_numbers=True,
-    )
+    endpoint=os.environ["RDK_ENDPOINT"],
+    api_key=os.environ["RDK_API_KEY"],
+    sample_rate=0.1,        # Capture 10% of traces
+    redact_pii=True,        # Remove emails, phones, SSNs, etc.
+    on_error=lambda e: logger.error(f"RDK transport error: {e}"),
+)
+```
+
+### Testing
+
+```python
+from rdk import init
+
+# No HTTP calls; tool calls return "MOCKED" by default
+init(
+    endpoint="https://placeholder",
+    api_key="test",
+    test_mode=True,
+)
+```
+
+### Disable tracing entirely
+
+```python
+from rdk import init
+
+init(
+    endpoint="...",
+    api_key="...",
+    enabled=False,  # init() returns None, nothing is instrumented
 )
 ```
 
@@ -70,19 +161,26 @@ init(
 
 When called, `init()`:
 
-1. Creates a singleton RDK client
-2. Starts the background flush timer
-3. Instruments supported LLM SDKs (Anthropic, OpenAI, etc.)
+1. Resolves `test_mode` from the argument or `RDK_TEST_MODE` env var
+2. Creates a singleton `RDK` client
+3. Starts the background flush timer
+4. Instruments the enabled LLM SDKs
+
+If `enabled=False`, none of the above occurs and `None` is returned.
 
 <Warning>
 Call `init()` once at application startup, before any LLM calls.
 </Warning>
 
-## Thread Safety
+## Environment Variables
 
-`init()` is thread-safe. Multiple calls are idempotent—only the first call has effect.
+| Variable | Effect |
+|----------|--------|
+| `RDK_TEST_MODE=1` | Equivalent to `test_mode=True` |
 
 ## See Also
 
-- [shutdown()](/api-reference/shutdown) - Clean up the client
-- [flush()](/api-reference/flush) - Manually flush traces
+- [shutdown()](/api-reference/shutdown) — Clean up the client
+- [flush()](/api-reference/flush) — Manually flush traces
+- [RedactorConfig](/api-reference/redactor-config) — Custom PII redaction
+- [Testing guide](/guides/testing) — Writing tests with RDK

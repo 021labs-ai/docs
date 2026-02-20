@@ -1,12 +1,22 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "willow",
   "name": "RDK Python SDK",
   "colors": {
-    "primary": "#6366F1",
-    "light": "#818CF8",
-    "dark": "#4F46E5"
+    "primary": "#000000",
+    "light": "#666666",
+    "dark": "#000000"
   },
+  "appearance": {
+    "default": "light"
+  },
+  "background": {
+    "decoration": "grid"
+  },
+  "codeBlock": {
+    "theme": "dracula"
+  },
+  "rounded": "default",
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
@@ -32,18 +42,11 @@
             ]
           },
           {
-            "group": "Features",
-            "pages": [
-              "features/pii-redaction",
-              "features/custom-metadata",
-              "features/manual-tracing"
-            ]
-          },
-          {
             "group": "Guides",
             "pages": [
               "guides/fastapi",
-              "guides/agent-tracing"
+              "guides/agent-tracing",
+              "guides/testing"
             ]
           }
         ]
@@ -52,12 +55,30 @@
         "tab": "API Reference",
         "groups": [
           {
-            "group": "Core API",
+            "group": "Core",
             "pages": [
               "api-reference/init",
               "api-reference/observe",
+              "api-reference/trace",
+              "api-reference/span",
               "api-reference/flush",
               "api-reference/shutdown"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api-reference/get-current-trace",
+              "api-reference/instrument-baml",
+              "api-reference/mock-tools"
+            ]
+          },
+          {
+            "group": "PII Redaction",
+            "pages": [
+              "api-reference/redactor-config",
+              "api-reference/create-redactor",
+              "api-reference/redact-all-pii"
             ]
           },
           {

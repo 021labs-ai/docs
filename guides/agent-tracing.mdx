@@ -17,8 +17,8 @@ from anthropic import Anthropic
 from rdk import init, observe, shutdown
 
 init(
-    endpoint=os.environ.get("RDK_ENDPOINT"),
-    api_key=os.environ.get("RDK_API_KEY"),
+    endpoint=os.environ["RDK_ENDPOINT"],
+    api_key=os.environ["RDK_API_KEY"],
 )
 
 # Define tools
@@ -121,38 +121,23 @@ Trace: "research-agent"
 
 ## Tool Execution Tracing
 
-For detailed tool tracing, create manual spans:
+Use `span()` to trace individual tool executions:
 
 ```python
-from rdk import observe
-from rdk.models import Span, SpanType
-from rdk.context import TraceContext
+from rdk import observe, span
+from rdk.models import SpanType
 
 def execute_tool_traced(name: str, args: dict) -> str:
     """Execute tool with tracing."""
-    trace = TraceContext.get_trace()
-
-    span = Span(
-        trace_id=trace.id,
-        name=f"tool.{name}",
-        type=SpanType.TOOL,
-        input={"args": args}
-    )
-    trace.spans.append(span)
-
-    try:
+    with span(f"tool.{name}", span_type=SpanType.TOOL, input_data={"args": args}) as s:
         if name == "search":
             result = f"Results for '{args['query']}': ..."
         elif name == "calculate":
             result = str(eval(args["expression"]))
         else:
             result = "Unknown tool"
-
-        span.complete(output={"result": result})
-        return result
-    except Exception as e:
-        span.fail(str(e))
-        raise
+        s.metadata["result"] = result
+    return result
 ```
 
 Now your trace shows tool execution:
@@ -172,6 +157,7 @@ For chat applications, preserve session context:
 
 ```python
 import uuid
+from anthropic import Anthropic
 from rdk import observe
 
 class ChatSession:
@@ -211,68 +197,50 @@ session.send_message("What did I just say?")
 
 ## ReAct Pattern
 
-For ReAct (Reasoning + Acting) agents:
+For ReAct (Reasoning + Acting) agents, use `span()` for thought and action steps:
 
 ```python
-from rdk import observe
-from rdk.models import Span, SpanType
-from rdk.context import TraceContext
+from anthropic import Anthropic
+from rdk import observe, span
+from rdk.models import SpanType
 
 @observe(name="react-agent", tags=["react"])
 def react_agent(task: str) -> str:
-    trace = TraceContext.get_trace()
     client = Anthropic()
-
     context = f"Task: {task}\n\n"
     max_steps = 5
 
     for step in range(max_steps):
         # Thought step
-        thought_span = Span(
-            trace_id=trace.id,
-            name=f"thought_{step}",
-            type=SpanType.CHAIN,
-            input={"step": step}
-        )
-        trace.spans.append(thought_span)
-
-        thought_response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=500,
-            messages=[{
-                "role": "user",
-                "content": f"{context}\nThink about what to do next."
-            }]
-        )
-        thought = thought_response.content[0].text
-        thought_span.complete(output={"thought": thought})
+        with span(f"thought_{step}", span_type=SpanType.CHAIN, input_data={"step": step}) as s:
+            thought_response = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=500,
+                messages=[{
+                    "role": "user",
+                    "content": f"{context}\nThink about what to do next."
+                }]
+            )
+            thought = thought_response.content[0].text
+            s.metadata["thought"] = thought
 
         # Action step
-        action_span = Span(
-            trace_id=trace.id,
-            name=f"action_{step}",
-            type=SpanType.TOOL,
-            input={"thought": thought[:100]}
-        )
-        trace.spans.append(action_span)
+        with span(f"action_{step}", span_type=SpanType.TOOL, input_data={"thought": thought[:100]}) as s:
+            action_response = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=500,
+                tools=tools,
+                messages=[{
+                    "role": "user",
+                    "content": f"{context}\nThought: {thought}\n\nNow take an action."
+                }]
+            )
 
-        action_response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=500,
-            tools=tools,
-            messages=[{
-                "role": "user",
-                "content": f"{context}\nThought: {thought}\n\nNow take an action."
-            }]
-        )
+            if action_response.stop_reason == "end_turn":
+                s.metadata["done"] = True
+                return action_response.content[0].text
 
-        if action_response.stop_reason == "end_turn":
-            action_span.complete(output={"done": True})
-            return action_response.content[0].text
-
-        # Execute action and continue
-        # ...
-        action_span.complete(output={"action": "executed"})
+            s.metadata["action"] = "executed"
 
     return "Max steps reached"
 ```
@@ -283,8 +251,13 @@ def react_agent(task: str) -> str:
 Name your traces after the agent's purpose, not implementation details. Use "customer-support-agent" not "anthropic-tool-loop".
 </Tip>
 
-1. **One trace per task** - Wrap the entire agent execution in `@observe`
-2. **Trace tool execution** - Create manual spans for tool calls
-3. **Include iteration context** - Add step numbers to metadata
-4. **Set reasonable limits** - Cap iterations to prevent runaway traces
-5. **Tag by agent type** - Use tags like `["agent", "react"]` for filtering
+1. **One trace per task** — Wrap the entire agent execution in `@observe`
+2. **Trace tool execution** — Use `span()` for custom tool calls
+3. **Include iteration context** — Add step numbers to metadata
+4. **Set reasonable limits** — Cap iterations to prevent runaway traces
+5. **Tag by agent type** — Use tags like `["agent", "react"]` for filtering
+
+## See Also
+
+- [span()](/api-reference/span) — Manual span API reference
+- [@observe](/api-reference/observe) — Trace decorator

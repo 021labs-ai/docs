@@ -5,111 +5,63 @@ description: 'Create custom spans for non-LLM operations'
 
 ## Overview
 
-While RDK auto-instruments LLM calls, you may want to trace other operations in your application—database queries, API calls, or business logic. Manual tracing lets you create custom spans.
+While RDK auto-instruments LLM calls, you may want to trace other operations — database queries, API calls, or business logic. Use the `span()` context manager to create custom spans.
 
 ## Creating Manual Spans
 
 ```python
-from rdk import init, observe
-from rdk.models import Span, SpanType, SpanStatus
-from rdk.context import TraceContext
+from rdk import init, observe, span
+from rdk.models import SpanType
 
 init(endpoint="...", api_key="...")
 
 @observe(name="process-order")
 def process_order(order_id: str) -> dict:
-    trace = TraceContext.get_trace()
-
-    # Create a span for database query
-    db_span = Span(
-        trace_id=trace.id,
-        name="fetch_order",
-        type=SpanType.FUNCTION,
-        input={"order_id": order_id}
-    )
-
-    try:
-        # Your operation
+    with span("fetch_order", span_type=SpanType.FUNCTION, input_data={"order_id": order_id}) as s:
         order = database.get_order(order_id)
-
-        db_span.complete(output={"status": "found"})
-    except Exception as e:
-        db_span.fail(str(e))
-        raise
-    finally:
-        trace.spans.append(db_span)
-
+        s.metadata["found"] = order is not None
     return order
 ```
 
+The `span()` context manager handles timing and status automatically:
+
+- On normal exit: span is marked `SUCCESS`
+- On exception: span is marked `ERROR`, then the exception re-raises
+
 ## Span Types
 
-Choose the appropriate type for your operation:
+Choose the type that best describes the operation:
 
 | Type | Use Case |
 |------|----------|
 | `SpanType.LLM` | Language model calls |
-| `SpanType.CHAIN` | Orchestration/workflow logic |
-| `SpanType.TOOL` | External tool/API calls |
-| `SpanType.FUNCTION` | Internal functions/operations |
+| `SpanType.CHAIN` | Orchestration / workflow logic |
+| `SpanType.TOOL` | External tool or API calls |
+| `SpanType.FUNCTION` | Internal functions or business logic |
 
 ## Complete Example
 
-Here's a full example with multiple manual spans:
+Multiple manual spans in one function:
 
 ```python
 from anthropic import Anthropic
-from rdk import init, observe, shutdown
-from rdk.models import Span, SpanType
-from rdk.context import TraceContext
+from rdk import init, observe, span, shutdown
+from rdk.models import SpanType
 
 init(endpoint="...", api_key="...")
-
-def create_span(name: str, span_type: SpanType, input_data: dict) -> Span:
-    """Helper to create spans attached to current trace."""
-    trace = TraceContext.get_trace()
-    span = Span(
-        trace_id=trace.id,
-        name=name,
-        type=span_type,
-        input=input_data
-    )
-    trace.spans.append(span)
-    return span
 
 @observe(name="customer-lookup")
 def lookup_customer(email: str) -> dict:
     # Span for database lookup
-    db_span = create_span(
-        "database.query",
-        SpanType.FUNCTION,
-        {"query": "SELECT * FROM customers WHERE email = ?"}
-    )
-
-    try:
-        # Simulated database call
+    with span("database.query", span_type=SpanType.FUNCTION, input_data={"query": "SELECT ... WHERE email = ?"}):
         customer = {"id": "123", "name": "John", "email": email}
-        db_span.complete(output={"found": True, "customer_id": "123"})
-    except Exception as e:
-        db_span.fail(str(e))
-        raise
 
     # Span for external API call
-    api_span = create_span(
-        "crm.enrich",
-        SpanType.TOOL,
-        {"customer_id": "123"}
-    )
-
-    try:
-        # Simulated API call
+    with span("crm.enrich", span_type=SpanType.TOOL, input_data={"customer_id": "123"}) as s:
         enriched = {"customer": customer, "score": 85}
-        api_span.complete(output={"score": 85})
-    except Exception as e:
-        api_span.fail(str(e))
-        raise
+        s.metadata["score"] = 85
 
-    # Now make an LLM call (auto-traced)
+    # LLM call is auto-traced
     client = Anthropic()
     response = client.messages.create(
         model="claude-sonnet-4-6",
@@ -129,77 +81,20 @@ result = lookup_customer("john@example.com")
 shutdown()
 ```
 
-## Parent-Child Relationships
+## Attaching Data During Execution
 
-For nested operations, use `parent_id`:
-
-```python
-from rdk.models import Span, SpanType
-from rdk.context import TraceContext
-
-@observe(name="pipeline")
-def pipeline(data: list):
-    trace = TraceContext.get_trace()
-
-    # Parent span
-    parent = Span(
-        trace_id=trace.id,
-        name="batch_process",
-        type=SpanType.CHAIN,
-        input={"count": len(data)}
-    )
-    trace.spans.append(parent)
-
-    results = []
-    for i, item in enumerate(data):
-        # Child span
-        child = Span(
-            trace_id=trace.id,
-            parent_id=parent.id,  # Link to parent
-            name=f"process_item_{i}",
-            type=SpanType.FUNCTION,
-            input={"item": item}
-        )
-        trace.spans.append(child)
-
-        try:
-            result = process_item(item)
-            child.complete(output={"result": result})
-            results.append(result)
-        except Exception as e:
-            child.fail(str(e))
-
-    parent.complete(output={"processed": len(results)})
-    return results
-```
-
-## Timing Control
-
-Spans automatically capture start time. Control end time manually:
+Write to `s.metadata` inside the block to record data discovered during execution:
 
 ```python
-from rdk.models import Span, SpanType, SpanStatus, _now_ms
-from rdk.context import TraceContext
-
-trace = TraceContext.get_trace()
-
-span = Span(
-    trace_id=trace.id,
-    name="long_operation",
-    type=SpanType.FUNCTION,
-    input={}
-)
-
-# Do work...
-
-# Manual completion with timing
-span.end_time = _now_ms()
-span.duration = span.end_time - span.start_time
-span.status = SpanStatus.SUCCESS
-span.output = {"result": "done"}
-
-trace.spans.append(span)
+with span("vector-search", input_data={"query": query}) as s:
+    results = vector_db.search(query)
+    s.metadata["result_count"] = len(results)
+    s.metadata["top_score"] = results[0].score if results else None
 ```
+
+## Outside a Trace
+
+If `span()` is called outside an active trace context, it yields a no-op dummy span. No error is raised, and no data is sent. This makes it safe to call `span()` in library code that may or may not be traced by the caller.
 
 ## Best Practices
 
@@ -207,7 +102,12 @@ trace.spans.append(span)
 Only create manual spans for operations you actually want to trace. Too many spans can make traces hard to read.
 </Tip>
 
-1. **Use descriptive names** - `database.query.customers` not `db1`
-2. **Include relevant input** - But avoid sensitive data
-3. **Always complete spans** - Use try/finally to ensure completion
-4. **Set appropriate types** - Helps with filtering and visualization
+1. **Use descriptive names** — `database.query.customers` not `db1`
+2. **Include relevant input** — But avoid sensitive data
+3. **Set appropriate types** — Helps with filtering and visualization
+4. **Don't over-instrument** — Auto-instrumented LLM calls don't need manual spans
+
+## See Also
+
+- [span()](/api-reference/span) — Full API reference
+- [SpanType / SpanStatus](/api-reference/models/span) — Enum values

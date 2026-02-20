@@ -24,18 +24,17 @@ uv add rdk
 Initialize RDK at the start of your application:
 
 ```python
+import os
 from rdk import init
 
 init(
-    endpoint="https://collector.021labs.ai",
-    api_key="your-api-key",
-    batch_size=10,        # Send traces in batches of 10
-    flush_interval=5.0,   # Or every 5 seconds
+    endpoint=os.environ["RDK_ENDPOINT"],
+    api_key=os.environ["RDK_API_KEY"],
 )
 ```
 
 <Tip>
-Store your API key in an environment variable `RDK_API_KEY` for security.
+Store your API key in environment variables and never commit it to source control.
 </Tip>
 
 ### 2. Add the @observe Decorator
@@ -57,6 +56,8 @@ def chat(message: str) -> str:
     return response.content[0].text
 ```
 
+The `name` parameter is optional — if omitted, the function name is used.
+
 ### 3. Shutdown Gracefully
 
 Flush remaining traces before your app exits:
@@ -77,8 +78,8 @@ from anthropic import Anthropic
 
 # Initialize
 init(
-    endpoint=os.environ.get("RDK_ENDPOINT", "https://collector.021labs.ai"),
-    api_key=os.environ.get("RDK_API_KEY"),
+    endpoint=os.environ["RDK_ENDPOINT"],
+    api_key=os.environ["RDK_API_KEY"],
 )
 
 @observe(name="summarize")
@@ -110,26 +111,37 @@ shutdown()
 | `api_key` | str | required | Your RDK API key |
 | `batch_size` | int | 10 | Number of spans per batch |
 | `flush_interval` | float | 5.0 | Seconds between auto-flushes |
-| `redactor_config` | RedactorConfig | None | PII redaction settings |
+| `timeout` | float | 30.0 | HTTP request timeout in seconds |
+| `sample_rate` | float | 1.0 | Fraction of traces to capture (0–1) |
+| `redact_pii` | bool | False | Enable built-in PII redaction |
+| `redactor` | Callable | None | Custom redaction function |
+| `debug` | bool | False | Enable verbose debug logging |
+| `enabled` | bool | True | Set to `False` to disable all tracing |
+| `test_mode` | bool | None | Use null transport + mock tools |
+| `on_error` | Callable | None | Callback for transport errors |
+| `instrument_langchain` | bool | True | Auto-instrument LangChain |
+| `instrument_anthropic` | bool | True | Auto-instrument Anthropic SDK |
+| `instrument_openai` | bool | True | Auto-instrument OpenAI SDK |
+| `instrument_gemini` | bool | True | Auto-instrument Gemini SDK |
+
+See [init()](/api-reference/init) for full documentation.
 
 ## Environment Variables
 
-RDK respects these environment variables:
-
-```bash
-export RDK_ENDPOINT="https://collector.021labs.ai"
-export RDK_API_KEY="your-api-key"
-```
+| Variable | Effect |
+|----------|--------|
+| `RDK_TEST_MODE=1` | Equivalent to `test_mode=True` |
 
 ## What Gets Traced?
 
-When you use `@observe`, RDK automatically captures:
+When you use `@observe`, RDK automatically captures LLM calls within the function:
 
-- **Input/Output** - Messages sent and received
-- **Token Usage** - Prompt, completion, and total tokens
-- **Timing** - Start time, end time, and duration
-- **Model Info** - Model name, provider, parameters
-- **Errors** - Exception messages and stack traces
+- **Token Usage** — Prompt, completion, and total tokens
+- **Timing** — Start time, end time, and duration
+- **Model Info** — Model name and provider
+- **Errors** — Exception messages
+
+Input messages and output content are **not** captured by default. To capture them, use `capture_input=True` and `capture_output=True` on `@observe`, or enable PII-safe redaction first.
 
 ## Next Steps
 
@@ -139,5 +151,11 @@ When you use `@observe`, RDK automatically captures:
   </Card>
   <Card title="PII Redaction" icon="shield" href="/features/pii-redaction">
     Protect sensitive data
+  </Card>
+  <Card title="Testing" icon="flask" href="/guides/testing">
+    Write tests without real API calls
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/init">
+    Full parameter reference
   </Card>
 </CardGroup>

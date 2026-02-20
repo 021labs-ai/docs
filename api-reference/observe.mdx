@@ -7,27 +7,27 @@ description: 'Decorator to create a trace context'
 
 ```python
 def observe(
-    name: str,
-    trace_id: str | None = None,
+    name: str | None = None,
+    *,
     tags: list[str] | None = None,
     metadata: dict | None = None,
-    user_id: str | None = None,
-    session_id: str | None = None,
+    user_id: str | Callable[[], str | None] | None = None,
+    session_id: str | Callable[[], str | None] | None = None,
+    version: str | None = None,
+    trace_id: str | Callable[[], str | None] | None = None,
+    capture_input: bool = False,
+    capture_output: bool = False,
+    tool_mocks: ToolMocks | None = None,
+    tool_mock_default: Any = USE_GLOBAL_DEFAULT,
 ) -> Callable
 ```
 
 ## Parameters
 
-<ParamField path="name" type="string" required>
-  Name for the trace. Should describe the operation being traced.
+<ParamField path="name" type="string" default="function name">
+  Name for the trace. Defaults to the decorated function's name if not provided.
 
   Example: `"chat-completion"`, `"customer-support"`, `"process-order"`
-</ParamField>
-
-<ParamField path="trace_id" type="string" default="auto-generated">
-  Custom trace ID. If not provided, a UUID is generated.
-
-  Use this to correlate traces across services.
 </ParamField>
 
 <ParamField path="tags" type="list[string]" default="[]">
@@ -37,50 +37,110 @@ def observe(
 </ParamField>
 
 <ParamField path="metadata" type="dict" default="{}">
-  Custom metadata to attach to the trace.
+  Custom key-value pairs to attach to the trace.
 
   Example: `{"order_id": "123", "plan": "enterprise"}`
 </ParamField>
 
-<ParamField path="user_id" type="string" default="None">
-  User identifier for the trace.
+<ParamField path="user_id" type="string | Callable[[], str | None]" default="None">
+  User identifier. Can be a static string or a zero-argument callable that returns a string.
 
-  Useful for filtering traces by user.
+  Example: `"user_123"` or `lambda: get_current_user_id()`
 </ParamField>
 
-<ParamField path="session_id" type="string" default="None">
-  Session identifier for grouping related traces.
-
-  Useful for multi-turn conversations.
+<ParamField path="session_id" type="string | Callable[[], str | None]" default="None">
+  Session identifier for grouping related traces. Accepts a string or callable.
 </ParamField>
 
-## Example
+<ParamField path="version" type="string" default="None">
+  Version string stored in trace metadata (e.g., model version, app version).
+
+  Example: `"1.0.0"`, `"claude-sonnet-4-6"`
+</ParamField>
+
+<ParamField path="trace_id" type="string | Callable[[], str | None]" default="auto-generated">
+  Explicit trace ID. If not provided, a UUID is generated. Accepts a string or callable.
+
+  Use this to correlate traces across services.
+</ParamField>
+
+<ParamField path="capture_input" type="boolean" default={false}>
+  If `True`, serialize the function's arguments and store them in `trace.metadata["input"]`.
+</ParamField>
+
+<ParamField path="capture_output" type="boolean" default={false}>
+  If `True`, serialize the function's return value and store it in `trace.metadata["output"]`.
+</ParamField>
+
+<ParamField path="tool_mocks" type="ToolMocks" default="None">
+  Mapping of tool names to mock outputs or callables. Active only within this function call.
+
+  See [mock_tools()](/api-reference/mock-tools) for details.
+</ParamField>
+
+<ParamField path="tool_mock_default" type="Any" default="USE_GLOBAL_DEFAULT">
+  Default mock response for any tool not in `tool_mocks`. Falls back to the process-wide default set by `test_mode`.
+</ParamField>
+
+## Examples
+
+### Basic
+
+```python
+from rdk import observe
+
+@observe()
+def chat(message: str) -> str:
+    # trace name defaults to "chat"
+    ...
+
+@observe(name="customer-support")
+def handle_request(message: str) -> str:
+    ...
+```
+
+### With metadata
 
 ```python
 from rdk import observe
 
 @observe(
-    name="customer-chat",
-    tags=["production", "chat"],
-    metadata={"channel": "web"},
-    user_id="user_123",
-    session_id="session_abc"
+    name="chat-pipeline",
+    tags=["production", "claude"],
+    metadata={"team": "ml-platform"},
+    version="2.1.0",
 )
-def handle_chat(message: str) -> str:
-    # All LLM calls here are grouped into this trace
+def pipeline(question: str) -> str:
     ...
 ```
 
-## Behavior
+### Dynamic user and session
 
-The `@observe` decorator:
+```python
+from rdk import observe
 
-1. Creates a new `Trace` object with the specified parameters
-2. Sets up a trace context (using `contextvars`)
-3. Executes the decorated function
-4. All LLM calls within the function are automatically added to the trace
+@observe(
+    name="chat",
+    user_id=lambda: get_current_user_id(),    # Callable — evaluated at call time
+    session_id=lambda: get_session_id(),
+)
+def chat(message: str) -> str:
+    ...
+```
 
-## Sync and Async Support
+### Capture inputs and outputs
+
+```python
+from rdk import observe
+
+@observe(name="summarize", capture_input=True, capture_output=True)
+def summarize(text: str) -> str:
+    # Arguments stored in trace.metadata["input"]
+    # Return value stored in trace.metadata["output"]
+    ...
+```
+
+### Sync and async
 
 Works with both sync and async functions:
 
@@ -98,41 +158,34 @@ async def async_chat(message: str) -> str:
 
 ## Nesting
 
-Nested `@observe` decorators create separate traces:
+Nested `@observe` decorators skip the inner trace — only the outermost creates a trace context. All LLM calls within nested functions are attributed to the outermost trace.
 
 ```python
 @observe(name="outer")
 def outer():
-    inner()  # Creates a separate trace
+    inner()  # No new trace created; spans go to "outer"
 
 @observe(name="inner")
 def inner():
     ...
 ```
 
-<Tip>
-For related operations, use a single `@observe` at the top level instead of nesting.
-</Tip>
+## Context manager alternative
 
-## Without Decorator
-
-If you need more control, use the trace context directly:
+If decorators aren't convenient (notebooks, scripts), use `trace()`:
 
 ```python
-from rdk.context import TraceContext
-from rdk.models import Trace
+from rdk import trace
 
-trace = Trace(name="manual-trace")
-token = TraceContext.set_trace(trace)
-
-try:
-    # Your code here
-    ...
-finally:
-    TraceContext.reset(token)
+with trace("my-operation", tags=["dev"]) as t:
+    print(f"Trace ID: {t.id}")
+    # LLM calls here are captured
 ```
+
+See [trace()](/api-reference/trace) for details.
 
 ## See Also
 
-- [Core Concepts](/concepts) - Understanding traces and spans
-- [Custom Metadata](/features/custom-metadata) - Adding custom data to traces
+- [trace()](/api-reference/trace) — Context manager alternative
+- [span()](/api-reference/span) — Create manual spans within a trace
+- [Custom Metadata](/features/custom-metadata) — Adding custom data to traces

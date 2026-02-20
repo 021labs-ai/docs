@@ -1,0 +1,90 @@
+---
+title: RedactorConfig
+description: 'Configuration for PII redaction'
+---
+
+## Class
+
+```python
+class RedactorConfig:
+    def __init__(
+        self,
+        redact_emails: bool = True,
+        redact_phones: bool = True,
+        redact_ssn: bool = True,
+        redact_credit_cards: bool = True,
+        redact_api_keys: bool = True,
+        custom_patterns: list[tuple[re.Pattern, str]] | None = None,
+        custom_redactor: Callable[[str], str] | None = None,
+    )
+```
+
+## Parameters
+
+<ParamField path="redact_emails" type="boolean" default={true}>
+  Redact email addresses. Replacement: `[EMAIL REDACTED]`
+</ParamField>
+
+<ParamField path="redact_phones" type="boolean" default={true}>
+  Redact US phone numbers (`555-123-4567`, `555.123.4567`, `5551234567`). Replacement: `[PHONE REDACTED]`
+</ParamField>
+
+<ParamField path="redact_ssn" type="boolean" default={true}>
+  Redact US Social Security Numbers (`123-45-6789`). Replacement: `[SSN REDACTED]`
+</ParamField>
+
+<ParamField path="redact_credit_cards" type="boolean" default={true}>
+  Redact 16-digit credit card numbers. Replacement: `[CARD REDACTED]`
+</ParamField>
+
+<ParamField path="redact_api_keys" type="boolean" default={true}>
+  Redact API keys matching `sk-`, `api_key`, or `bearer <token>` patterns. Replacement: `[API_KEY REDACTED]`
+</ParamField>
+
+<ParamField path="custom_patterns" type="list[tuple[re.Pattern, str]]" default="[]">
+  List of `(compiled_regex, replacement_string)` tuples. Applied after built-in patterns.
+
+  ```python
+  import re
+  custom_patterns=[
+      (re.compile(r"ACC-\d{8}"), "[ACCOUNT REDACTED]"),
+      (re.compile(r"EMP-\d{6}"), "[EMPLOYEE_ID REDACTED]"),
+  ]
+  ```
+</ParamField>
+
+<ParamField path="custom_redactor" type="Callable[[str], str]" default="None">
+  A function `(text: str) -> str` applied to each string value **before** the built-in patterns. Use for custom preprocessing or formats that regex can't handle.
+</ParamField>
+
+## Example
+
+```python
+import re
+from rdk import RedactorConfig, create_redactor, init
+
+config = RedactorConfig(
+    redact_emails=True,
+    redact_phones=True,
+    redact_ssn=True,
+    redact_credit_cards=True,
+    redact_api_keys=True,
+    custom_patterns=[
+        (re.compile(r"ACC-\d{8}"), "[ACCOUNT REDACTED]"),
+    ],
+)
+
+redactor = create_redactor(config)
+
+init(
+    endpoint="...",
+    api_key="...",
+    redactor=redactor,
+)
+```
+
+## See Also
+
+- [create_redactor()](/api-reference/create-redactor) — Build a redactor from config
+- [PII Redaction guide](/features/pii-redaction) — Overview and examples
+- [init()](/api-reference/init) — `redact_pii` and `redactor` parameters

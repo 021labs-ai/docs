@@ -9,172 +9,149 @@ RDK can automatically redact Personally Identifiable Information (PII) from your
 
 ## Quick Start
 
+### Enable built-in redaction
+
+Pass `redact_pii=True` to `init()` to enable default PII redaction:
+
 ```python
 from rdk import init
-from rdk.redactor import RedactorConfig
 
 init(
     endpoint="...",
     api_key="...",
-    redactor_config=RedactorConfig(
-        redact_emails=True,
-        redact_phone_numbers=True,
-        redact_ssn=True,
-    )
+    redact_pii=True,
+)
+```
+
+### Custom redaction
+
+For fine-grained control, build a redactor with `RedactorConfig`:
+
+```python
+import re
+from rdk import init
+from rdk import RedactorConfig, create_redactor
+
+redactor = create_redactor(RedactorConfig(
+    redact_emails=True,
+    redact_phones=True,
+    redact_ssn=True,
+    redact_credit_cards=True,
+    redact_api_keys=True,
+    custom_patterns=[
+        (re.compile(r"ACC-\d{8}"), "[ACCOUNT REDACTED]"),
+        (re.compile(r"EMP-\d{6}"), "[EMPLOYEE_ID REDACTED]"),
+    ],
+))
+
+init(
+    endpoint="...",
+    api_key="...",
+    redactor=redactor,
 )
 ```
 
 ## Built-in Patterns
 
-RDK includes redaction patterns for common PII types:
+| Type | Example | Redacted As |
+|------|---------|-------------|
+| Email | `john@example.com` | `[EMAIL REDACTED]` |
+| Phone | `555-123-4567` | `[PHONE REDACTED]` |
+| SSN | `123-45-6789` | `[SSN REDACTED]` |
+| Credit Card | `4111-1111-1111-1111` | `[CARD REDACTED]` |
+| API Key | `sk-abc123...` | `[API_KEY REDACTED]` |
 
-| Type | Example | Redacted |
-|------|---------|----------|
-| Email | `john@example.com` | `[EMAIL_REDACTED]` |
-| Phone | `(555) 123-4567` | `[PHONE_REDACTED]` |
-| SSN | `123-45-6789` | `[SSN_REDACTED]` |
-| Credit Card | `4111-1111-1111-1111` | `[CREDIT_CARD_REDACTED]` |
-
-## Configuration Options
-
-```python
-from rdk import init
-from rdk.redactor import RedactorConfig
-
-config = RedactorConfig(
-    # Built-in patterns
-    redact_emails=True,
-    redact_phone_numbers=True,
-    redact_ssn=True,
-    redact_credit_cards=True,
-
-    # Custom patterns
-    custom_patterns={
-        "account_number": r"ACC-\d{8}",
-        "api_key": r"sk-[a-zA-Z0-9]{32}",
-    }
-)
-
-init(
-    endpoint="...",
-    api_key="...",
-    redactor_config=config
-)
-```
-
-## Custom Patterns
-
-Add your own regex patterns to redact domain-specific data:
+## RedactorConfig Fields
 
 ```python
-from rdk import init
-from rdk.redactor import RedactorConfig
-
-config = RedactorConfig(
-    custom_patterns={
-        # Redact internal IDs
-        "employee_id": r"EMP-\d{6}",
-        # Redact medical record numbers
-        "mrn": r"MRN\d{10}",
-        # Redact customer IDs
-        "customer_id": r"CUST-[A-Z]{2}\d{8}",
-    }
-)
-
-init(endpoint="...", api_key="...", redactor_config=config)
+class RedactorConfig:
+    redact_emails: bool = True
+    redact_phones: bool = True
+    redact_ssn: bool = True
+    redact_credit_cards: bool = True
+    redact_api_keys: bool = True
+    custom_patterns: list[tuple[re.Pattern, str]] | None = None
+    custom_redactor: Callable[[str], str] | None = None
 ```
 
-Custom patterns appear as `[PATTERN_NAME_REDACTED]`:
-- `EMP-123456` → `[EMPLOYEE_ID_REDACTED]`
-- `MRN1234567890` → `[MRN_REDACTED]`
+<ParamField path="redact_emails" type="boolean" default={true}>
+  Redact email addresses.
+</ParamField>
 
-## Complete Example
+<ParamField path="redact_phones" type="boolean" default={true}>
+  Redact phone numbers (formats: `555-123-4567`, `555.123.4567`, `5551234567`).
+</ParamField>
 
-Here's a full example with a customer support agent that handles sensitive data:
+<ParamField path="redact_ssn" type="boolean" default={true}>
+  Redact US Social Security Numbers (`123-45-6789`).
+</ParamField>
+
+<ParamField path="redact_credit_cards" type="boolean" default={true}>
+  Redact 16-digit credit card numbers.
+</ParamField>
+
+<ParamField path="redact_api_keys" type="boolean" default={true}>
+  Redact API keys matching common patterns (`sk-`, `api_key`, `bearer ...`).
+</ParamField>
+
+<ParamField path="custom_patterns" type="list[tuple[re.Pattern, str]]" default="[]">
+  List of `(compiled_pattern, replacement_string)` tuples applied after built-in patterns.
+
+  ```python
+  import re
+  custom_patterns=[
+      (re.compile(r"ACC-\d{8}"), "[ACCOUNT REDACTED]"),
+  ]
+  ```
+</ParamField>
+
+<ParamField path="custom_redactor" type="Callable[[str], str]" default="None">
+  A function applied to each string value before the built-in patterns. Use for custom logic that regex can't express.
+</ParamField>
+
+## Utility Functions
 
 ```python
-import os
-from anthropic import Anthropic
-from rdk import init, observe, shutdown
-from rdk.redactor import RedactorConfig
-
-# Initialize with PII redaction
-init(
-    endpoint=os.environ.get("RDK_ENDPOINT"),
-    api_key=os.environ.get("RDK_API_KEY"),
-    redactor_config=RedactorConfig(
-        redact_emails=True,
-        redact_phone_numbers=True,
-        redact_ssn=True,
-        redact_credit_cards=True,
-        custom_patterns={
-            "account_number": r"ACC-\d{8}",
-        }
-    )
-)
-
-@observe(name="customer-support")
-def handle_inquiry(message: str) -> str:
-    client = Anthropic()
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
-        messages=[{
-            "role": "user",
-            "content": message
-        }]
-    )
-    return response.content[0].text
-
-# This message contains PII
-result = handle_inquiry("""
-    Hi, I'm John Smith. My email is john.smith@example.com
-    and my phone is (555) 123-4567. My account number is
-    ACC-12345678 and my SSN is 123-45-6789.
-    Can you help me with my bill?
-""")
-
-# In traces, all PII is redacted:
-# - john.smith@example.com → [EMAIL_REDACTED]
-# - (555) 123-4567 → [PHONE_REDACTED]
-# - ACC-12345678 → [ACCOUNT_NUMBER_REDACTED]
-# - 123-45-6789 → [SSN_REDACTED]
-
-shutdown()
+from rdk import redact_all_pii
+from rdk.filters import create_default_redactor
 ```
+
+**`redact_all_pii(value)`** — One-shot redaction using all default patterns. Useful for sanitizing data outside of traces.
+
+```python
+from rdk import redact_all_pii
+
+clean = redact_all_pii({
+    "message": "Call me at 555-123-4567 or john@example.com"
+})
+# {"message": "Call me at [PHONE REDACTED] or [EMAIL REDACTED]"}
+```
+
+**`create_default_redactor()`** — Returns a reusable redactor with all defaults enabled.
 
 ## What Gets Redacted
 
 Redaction is applied to:
 
-- **Span inputs** - Messages sent to the LLM
-- **Span outputs** - Responses from the LLM
-- **Tool arguments** - Data passed to tools
-- **Tool results** - Data returned from tools
+- Span inputs — messages sent to the LLM
+- Span outputs — responses from the LLM
+- Tool arguments and results
 
-Redaction is NOT applied to:
+Redaction is **not** applied to:
 
 - Trace/span IDs
 - Timestamps
 - Token counts
 - Model names
-- Metadata keys (only values)
-
-## Performance
-
-PII redaction adds minimal overhead:
-
-- Patterns are compiled once at startup
-- Redaction runs before network I/O (during batching)
-- Only string values are scanned
-
-<Tip>
-For high-throughput applications, limit the number of custom patterns to maintain performance.
-</Tip>
+- Metadata keys (only values are scanned)
 
 ## Best Practices
 
-1. **Enable by default** - Always enable PII redaction in production
-2. **Test your patterns** - Verify custom patterns catch your data formats
-3. **Review traces** - Periodically check that redaction is working
-4. **Use specific patterns** - Narrow patterns reduce false positives
+1. Always enable PII redaction in production
+2. Test custom patterns against realistic sample data before deploying
+3. Use `custom_redactor` for preprocessing (e.g., tokenization) before regex matching
+
+## See Also
+
+- [create_redactor()](/api-reference/create-redactor) — API reference
+- [RedactorConfig](/api-reference/redactor-config) — Full config reference
