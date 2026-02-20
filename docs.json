@@ -10,9 +10,6 @@
   "appearance": {
     "default": "light"
   },
-  "background": {
-    "decoration": "grid"
-  },
   "codeBlock": {
     "theme": "dracula"
   },
