@@ -3,15 +3,15 @@
   "theme": "willow",
   "name": "RDK Python SDK",
   "colors": {
-    "primary": "#000000",
-    "light": "#666666",
-    "dark": "#000000"
+    "primary": "#1a1a1a",
+    "light": "#444444",
+    "dark": "#f5f5f4"
   },
   "appearance": {
     "default": "light"
   },
   "background": {
-    "decoration": "grid"
+    "decoration": "none"
   },
   "codeBlock": {
     "theme": "dracula"
