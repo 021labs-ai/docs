@@ -11,7 +11,7 @@
     "default": "light"
   },
   "background": {
-    "decoration": "none"
+    "decoration": "grid"
   },
   "codeBlock": {
     "theme": "dracula"
