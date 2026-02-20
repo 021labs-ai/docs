@@ -1,0 +1,120 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "RDK Python SDK",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#818CF8",
+    "dark": "#4F46E5"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "concepts"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/anthropic",
+              "integrations/openai",
+              "integrations/langchain",
+              "integrations/gemini",
+              "integrations/baml"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/pii-redaction",
+              "features/custom-metadata",
+              "features/manual-tracing"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/fastapi",
+              "guides/agent-tracing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api-reference/init",
+              "api-reference/observe",
+              "api-reference/flush",
+              "api-reference/shutdown"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api-reference/models/trace",
+              "api-reference/models/span",
+              "api-reference/models/token-usage"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/021/rdk-python",
+          "icon": "github"
+        },
+        {
+          "anchor": "PyPI",
+          "href": "https://pypi.org/project/rdk/",
+          "icon": "python"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@021labs.ai"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "/quickstart"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "claude",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/021/rdk-python"
+    }
+  }
+}

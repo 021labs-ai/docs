@@ -1,0 +1,180 @@
+---
+title: PII Redaction
+description: 'Automatically redact sensitive data from traces'
+---
+
+## Overview
+
+RDK can automatically redact Personally Identifiable Information (PII) from your traces before they're sent to the collector. This helps you maintain compliance while still getting valuable observability data.
+
+## Quick Start
+
+```python
+from rdk import init
+from rdk.redactor import RedactorConfig
+
+init(
+    endpoint="...",
+    api_key="...",
+    redactor_config=RedactorConfig(
+        redact_emails=True,
+        redact_phone_numbers=True,
+        redact_ssn=True,
+    )
+)
+```
+
+## Built-in Patterns
+
+RDK includes redaction patterns for common PII types:
+
+| Type | Example | Redacted |
+|------|---------|----------|
+| Email | `john@example.com` | `[EMAIL_REDACTED]` |
+| Phone | `(555) 123-4567` | `[PHONE_REDACTED]` |
+| SSN | `123-45-6789` | `[SSN_REDACTED]` |
+| Credit Card | `4111-1111-1111-1111` | `[CREDIT_CARD_REDACTED]` |
+
+## Configuration Options
+
+```python
+from rdk import init
+from rdk.redactor import RedactorConfig
+
+config = RedactorConfig(
+    # Built-in patterns
+    redact_emails=True,
+    redact_phone_numbers=True,
+    redact_ssn=True,
+    redact_credit_cards=True,
+
+    # Custom patterns
+    custom_patterns={
+        "account_number": r"ACC-\d{8}",
+        "api_key": r"sk-[a-zA-Z0-9]{32}",
+    }
+)
+
+init(
+    endpoint="...",
+    api_key="...",
+    redactor_config=config
+)
+```
+
+## Custom Patterns
+
+Add your own regex patterns to redact domain-specific data:
+
+```python
+from rdk import init
+from rdk.redactor import RedactorConfig
+
+config = RedactorConfig(
+    custom_patterns={
+        # Redact internal IDs
+        "employee_id": r"EMP-\d{6}",
+        # Redact medical record numbers
+        "mrn": r"MRN\d{10}",
+        # Redact customer IDs
+        "customer_id": r"CUST-[A-Z]{2}\d{8}",
+    }
+)
+
+init(endpoint="...", api_key="...", redactor_config=config)
+```
+
+Custom patterns appear as `[PATTERN_NAME_REDACTED]`:
+- `EMP-123456` → `[EMPLOYEE_ID_REDACTED]`
+- `MRN1234567890` → `[MRN_REDACTED]`
+
+## Complete Example
+
+Here's a full example with a customer support agent that handles sensitive data:
+
+```python
+import os
+from anthropic import Anthropic
+from rdk import init, observe, shutdown
+from rdk.redactor import RedactorConfig
+
+# Initialize with PII redaction
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT"),
+    api_key=os.environ.get("RDK_API_KEY"),
+    redactor_config=RedactorConfig(
+        redact_emails=True,
+        redact_phone_numbers=True,
+        redact_ssn=True,
+        redact_credit_cards=True,
+        custom_patterns={
+            "account_number": r"ACC-\d{8}",
+        }
+    )
+)
+
+@observe(name="customer-support")
+def handle_inquiry(message: str) -> str:
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": message
+        }]
+    )
+    return response.content[0].text
+
+# This message contains PII
+result = handle_inquiry("""
+    Hi, I'm John Smith. My email is john.smith@example.com
+    and my phone is (555) 123-4567. My account number is
+    ACC-12345678 and my SSN is 123-45-6789.
+    Can you help me with my bill?
+""")
+
+# In traces, all PII is redacted:
+# - john.smith@example.com → [EMAIL_REDACTED]
+# - (555) 123-4567 → [PHONE_REDACTED]
+# - ACC-12345678 → [ACCOUNT_NUMBER_REDACTED]
+# - 123-45-6789 → [SSN_REDACTED]
+
+shutdown()
+```
+
+## What Gets Redacted
+
+Redaction is applied to:
+
+- **Span inputs** - Messages sent to the LLM
+- **Span outputs** - Responses from the LLM
+- **Tool arguments** - Data passed to tools
+- **Tool results** - Data returned from tools
+
+Redaction is NOT applied to:
+
+- Trace/span IDs
+- Timestamps
+- Token counts
+- Model names
+- Metadata keys (only values)
+
+## Performance
+
+PII redaction adds minimal overhead:
+
+- Patterns are compiled once at startup
+- Redaction runs before network I/O (during batching)
+- Only string values are scanned
+
+<Tip>
+For high-throughput applications, limit the number of custom patterns to maintain performance.
+</Tip>
+
+## Best Practices
+
+1. **Enable by default** - Always enable PII redaction in production
+2. **Test your patterns** - Verify custom patterns catch your data formats
+3. **Review traces** - Periodically check that redaction is working
+4. **Use specific patterns** - Narrow patterns reduce false positives

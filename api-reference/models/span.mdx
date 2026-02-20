@@ -1,0 +1,196 @@
+---
+title: Span
+description: 'A single operation in a trace'
+---
+
+## Definition
+
+```python
+class Span(CamelModel):
+    id: str
+    trace_id: str
+    parent_id: str | None
+    name: str
+    type: SpanType
+    input: dict | None
+    output: dict | None
+    model: str | None
+    start_time: int
+    end_time: int | None
+    duration: int | None
+    token_usage: TokenUsage | None
+    metadata: dict
+    status: SpanStatus
+    error: SpanError | None
+    tags: list[str]
+```
+
+## Fields
+
+<ParamField path="id" type="string">
+  Unique identifier for the span. Auto-generated UUID.
+</ParamField>
+
+<ParamField path="trace_id" type="string" required>
+  ID of the parent trace.
+</ParamField>
+
+<ParamField path="parent_id" type="string">
+  ID of the parent span for nested operations.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Name describing this operation.
+</ParamField>
+
+<ParamField path="type" type="SpanType" required>
+  Type of operation: `LLM`, `CHAIN`, `TOOL`, or `FUNCTION`.
+</ParamField>
+
+<ParamField path="input" type="dict">
+  Input data for this operation.
+</ParamField>
+
+<ParamField path="output" type="dict">
+  Output data from this operation.
+</ParamField>
+
+<ParamField path="model" type="string">
+  Model name for LLM spans (e.g., "claude-sonnet-4-6").
+</ParamField>
+
+<ParamField path="start_time" type="integer">
+  Unix timestamp in milliseconds when the span started.
+</ParamField>
+
+<ParamField path="end_time" type="integer">
+  Unix timestamp in milliseconds when the span ended.
+</ParamField>
+
+<ParamField path="duration" type="integer">
+  Duration in milliseconds (`end_time - start_time`).
+</ParamField>
+
+<ParamField path="token_usage" type="TokenUsage">
+  Token counts for LLM spans.
+</ParamField>
+
+<ParamField path="metadata" type="dict">
+  Additional metadata (provider, parameters, etc.).
+</ParamField>
+
+<ParamField path="status" type="SpanStatus">
+  Current status: `RUNNING`, `SUCCESS`, or `ERROR`.
+</ParamField>
+
+<ParamField path="error" type="SpanError">
+  Error information if status is `ERROR`.
+</ParamField>
+
+<ParamField path="tags" type="list[string]">
+  Tags inherited from the trace.
+</ParamField>
+
+## SpanType Enum
+
+```python
+class SpanType(str, Enum):
+    LLM = "LLM"           # Language model calls
+    CHAIN = "CHAIN"       # Orchestration logic
+    TOOL = "TOOL"         # Tool/function execution
+    FUNCTION = "FUNCTION" # Custom function spans
+```
+
+## SpanStatus Enum
+
+```python
+class SpanStatus(str, Enum):
+    RUNNING = "RUNNING"   # In progress
+    SUCCESS = "SUCCESS"   # Completed successfully
+    ERROR = "ERROR"       # Failed with error
+```
+
+## Methods
+
+### complete()
+
+Mark span as successfully completed:
+
+```python
+span.complete(
+    output={"result": "success"},
+    token_usage=TokenUsage(
+        prompt_tokens=100,
+        completion_tokens=50,
+        total_tokens=150
+    )
+)
+```
+
+### fail()
+
+Mark span as failed:
+
+```python
+span.fail(
+    error_message="API timeout",
+    stack="Traceback (most recent call last)..."
+)
+```
+
+## Example
+
+```python
+from rdk.models import Span, SpanType, TokenUsage
+from rdk.context import TraceContext
+
+trace = TraceContext.get_trace()
+
+span = Span(
+    trace_id=trace.id,
+    name="database.query",
+    type=SpanType.FUNCTION,
+    input={"query": "SELECT * FROM users"}
+)
+
+try:
+    result = execute_query()
+    span.complete(output={"rows": len(result)})
+except Exception as e:
+    span.fail(str(e))
+finally:
+    trace.spans.append(span)
+```
+
+## JSON Serialization
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "traceId": "550e8400-e29b-41d4-a716-446655440000",
+  "parentId": null,
+  "name": "anthropic.messages.create",
+  "type": "LLM",
+  "input": {"messages": [...]},
+  "output": {"content": "..."},
+  "model": "claude-sonnet-4-6",
+  "startTime": 1708444800000,
+  "endTime": 1708444801500,
+  "duration": 1500,
+  "tokenUsage": {
+    "promptTokens": 100,
+    "completionTokens": 50,
+    "totalTokens": 150
+  },
+  "metadata": {"provider": "anthropic"},
+  "status": "SUCCESS",
+  "error": null,
+  "tags": ["production"]
+}
+```
+
+## See Also
+
+- [Trace](/api-reference/models/trace) - Parent container
+- [TokenUsage](/api-reference/models/token-usage) - Token counts
+- [Manual Tracing](/features/manual-tracing) - Creating custom spans

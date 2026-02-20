@@ -1,0 +1,203 @@
+---
+title: BAML
+description: 'Trace BAML structured extraction calls'
+---
+
+## What is BAML?
+
+[BAML](https://github.com/BoundaryML/baml) (Boundary AI Markup Language) is a domain-specific language for building type-safe LLM applications. It provides structured extraction with automatic validation and retry logic.
+
+## Installation
+
+```bash
+pip install rdk baml-py
+```
+
+## Setup
+
+### 1. Create BAML Files
+
+Create your BAML schema in `baml_src/main.baml`:
+
+```baml
+class CustomerInquiry {
+  category "billing" | "technical" | "general"
+  priority int @description("1-5, where 5 is highest")
+  summary string
+}
+
+function ClassifyInquiry(message: string) -> CustomerInquiry {
+  client Claude
+  prompt #"
+    Classify this customer inquiry:
+    {{ message }}
+
+    Return the classification as JSON.
+  "#
+}
+```
+
+### 2. Configure Generator
+
+Create `baml_src/generators.baml`:
+
+```baml
+generator target {
+  output_type python/pydantic
+  output_dir ../
+  version "0.219.0"
+}
+
+client<llm> Claude {
+  provider anthropic
+  options {
+    model "claude-sonnet-4-6"
+  }
+}
+```
+
+### 3. Generate Client
+
+```bash
+baml-cli generate
+```
+
+## Basic Usage
+
+```python
+import os
+from baml_client import b
+from baml_client.types import CustomerInquiry
+from rdk import init, observe, shutdown
+
+# Initialize RDK
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT"),
+    api_key=os.environ.get("RDK_API_KEY"),
+)
+
+@observe(name="classify-inquiry")
+def classify(message: str) -> CustomerInquiry:
+    return b.ClassifyInquiry(message)
+
+result = classify("I can't log into my account!")
+print(f"Category: {result.category}")
+print(f"Priority: {result.priority}")
+print(f"Summary: {result.summary}")
+
+shutdown()
+```
+
+## Async Support
+
+BAML async functions are fully supported:
+
+```python
+import asyncio
+from baml_client import b
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@observe(name="async-classify")
+async def async_classify(message: str):
+    return await b.ClassifyInquiry(message)
+
+result = asyncio.run(async_classify("Payment failed"))
+shutdown()
+```
+
+## Complex Types
+
+BAML excels at structured extraction with nested types:
+
+```baml
+class Address {
+  street string
+  city string
+  country string
+  postal_code string | null
+}
+
+class Contact {
+  name string
+  email string
+  phone string | null
+  address Address
+}
+
+function ExtractContact(text: string) -> Contact {
+  client Claude
+  prompt #"
+    Extract contact information from:
+    {{ text }}
+  "#
+}
+```
+
+```python
+from baml_client import b
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@observe(name="extract-contact")
+def extract_contact(text: str):
+    return b.ExtractContact(text)
+
+result = extract_contact("""
+    John Smith
+    john@example.com
+    123 Main St, New York, NY 10001
+""")
+print(f"Name: {result.name}")
+print(f"City: {result.address.city}")
+shutdown()
+```
+
+## What Gets Captured
+
+For each BAML call, RDK captures:
+
+| Field | Description |
+|-------|-------------|
+| `type` | LLM (BAML calls are LLM operations) |
+| `model` | Model from BAML client config |
+| `input.function` | BAML function name |
+| `input.args` | Function arguments |
+| `output.result` | Structured result |
+| `token_usage` | Token counts |
+| `metadata.provider` | "baml" |
+
+## Error Handling
+
+BAML provides validation errors for malformed responses:
+
+```python
+from baml_client import b
+from baml_client.errors import BamlValidationError
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@observe(name="safe-classify")
+def safe_classify(message: str):
+    try:
+        return b.ClassifyInquiry(message)
+    except BamlValidationError as e:
+        print(f"Validation failed: {e}")
+        return None
+
+result = safe_classify("Hello")
+shutdown()
+```
+
+## Best Practices
+
+<Tip>
+BAML handles retries automatically. RDK captures each attempt as a separate span.
+</Tip>
+
+1. **Use precise types** - BAML validation catches errors early
+2. **Add descriptions** - Help the LLM understand field meanings
+3. **Handle errors** - Wrap calls in try/except for production

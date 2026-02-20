@@ -1,0 +1,88 @@
+---
+title: init()
+description: 'Initialize the RDK client'
+---
+
+## Signature
+
+```python
+def init(
+    endpoint: str,
+    api_key: str,
+    batch_size: int = 10,
+    flush_interval: float = 5.0,
+    redactor_config: RedactorConfig | None = None,
+) -> None
+```
+
+## Parameters
+
+<ParamField path="endpoint" type="string" required>
+  The URL of your trace collector endpoint.
+
+  Example: `"https://collector.021labs.ai"`
+</ParamField>
+
+<ParamField path="api_key" type="string" required>
+  Your RDK API key for authentication.
+
+  Example: `"rdk_live_xxx..."`
+</ParamField>
+
+<ParamField path="batch_size" type="integer" default={10}>
+  Maximum number of spans to batch before sending.
+
+  Higher values reduce network calls but increase memory usage.
+</ParamField>
+
+<ParamField path="flush_interval" type="float" default={5.0}>
+  Maximum seconds between automatic flushes.
+
+  Lower values provide fresher data but more network overhead.
+</ParamField>
+
+<ParamField path="redactor_config" type="RedactorConfig" default="None">
+  Configuration for PII redaction.
+
+  See [PII Redaction](/features/pii-redaction) for details.
+</ParamField>
+
+## Example
+
+```python
+import os
+from rdk import init
+from rdk.redactor import RedactorConfig
+
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT", "https://collector.021labs.ai"),
+    api_key=os.environ.get("RDK_API_KEY"),
+    batch_size=20,
+    flush_interval=10.0,
+    redactor_config=RedactorConfig(
+        redact_emails=True,
+        redact_phone_numbers=True,
+    )
+)
+```
+
+## Behavior
+
+When called, `init()`:
+
+1. Creates a singleton RDK client
+2. Starts the background flush timer
+3. Instruments supported LLM SDKs (Anthropic, OpenAI, etc.)
+
+<Warning>
+Call `init()` once at application startup, before any LLM calls.
+</Warning>
+
+## Thread Safety
+
+`init()` is thread-safe. Multiple calls are idempotent—only the first call has effect.
+
+## See Also
+
+- [shutdown()](/api-reference/shutdown) - Clean up the client
+- [flush()](/api-reference/flush) - Manually flush traces

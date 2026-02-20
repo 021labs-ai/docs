@@ -1,0 +1,99 @@
+---
+title: TokenUsage
+description: 'Token usage information from LLM calls'
+---
+
+## Definition
+
+```python
+class TokenUsage(CamelModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+```
+
+## Fields
+
+<ParamField path="prompt_tokens" type="integer" required>
+  Number of tokens in the input/prompt.
+</ParamField>
+
+<ParamField path="completion_tokens" type="integer" required>
+  Number of tokens in the output/completion.
+</ParamField>
+
+<ParamField path="total_tokens" type="integer" required>
+  Total tokens used (`prompt_tokens + completion_tokens`).
+</ParamField>
+
+## Example
+
+```python
+from rdk.models import TokenUsage
+
+usage = TokenUsage(
+    prompt_tokens=150,
+    completion_tokens=75,
+    total_tokens=225
+)
+```
+
+## Automatic Capture
+
+RDK automatically captures token usage from LLM providers:
+
+```python
+from anthropic import Anthropic
+from rdk import init, observe
+
+init(endpoint="...", api_key="...")
+
+@observe(name="chat")
+def chat(message: str):
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": message}]
+    )
+    # Token usage is automatically captured in the span
+    return response.content[0].text
+```
+
+## Provider Support
+
+| Provider | Token Usage |
+|----------|-------------|
+| Anthropic | Yes |
+| OpenAI | Yes |
+| Google Gemini | Partial |
+| LangChain | Depends on underlying provider |
+
+## Cost Estimation
+
+Use token counts to estimate costs:
+
+```python
+# Example cost calculation (rates vary by model)
+COST_PER_1K_INPUT = 0.003   # $3 per 1M input tokens
+COST_PER_1K_OUTPUT = 0.015  # $15 per 1M output tokens
+
+def estimate_cost(usage: TokenUsage) -> float:
+    input_cost = (usage.prompt_tokens / 1000) * COST_PER_1K_INPUT
+    output_cost = (usage.completion_tokens / 1000) * COST_PER_1K_OUTPUT
+    return input_cost + output_cost
+```
+
+## JSON Serialization
+
+```json
+{
+  "promptTokens": 150,
+  "completionTokens": 75,
+  "totalTokens": 225
+}
+```
+
+## See Also
+
+- [Span](/api-reference/models/span) - Contains token usage

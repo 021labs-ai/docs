@@ -1,0 +1,168 @@
+---
+title: Custom Metadata
+description: 'Add custom tags and metadata to traces'
+---
+
+## Overview
+
+RDK allows you to attach custom metadata to your traces for better filtering, grouping, and analysis. This includes tags, arbitrary metadata, user IDs, and session IDs.
+
+## Tags
+
+Tags are simple string labels for categorizing traces:
+
+```python
+from rdk import observe
+
+@observe(name="chat", tags=["production", "gpt-4", "high-priority"])
+def chat(message: str) -> str:
+    # ...
+```
+
+Tags are useful for:
+- Environment labels (`production`, `staging`, `development`)
+- Feature flags (`new-model`, `experiment-a`)
+- Priority levels (`high-priority`, `batch`)
+
+## Metadata
+
+Metadata is a dictionary for storing structured data:
+
+```python
+from rdk import observe
+
+@observe(
+    name="process-order",
+    metadata={
+        "order_type": "subscription",
+        "plan": "enterprise",
+        "region": "us-west-2",
+    }
+)
+def process_order(order_id: str) -> dict:
+    # ...
+```
+
+Common metadata fields:
+- Business context (`order_type`, `plan`, `region`)
+- Request info (`request_id`, `source`)
+- Feature toggles (`model_version`, `experiment`)
+
+## User ID
+
+Track which user generated a trace:
+
+```python
+from rdk import observe
+
+@observe(name="chat", user_id="user_12345")
+def chat(user_id: str, message: str) -> str:
+    # ...
+
+# Or dynamically
+@observe(name="chat")
+def chat_dynamic(user_id: str, message: str) -> str:
+    # User ID from function parameter
+    # Would need to be set in metadata instead
+    ...
+```
+
+## Session ID
+
+Group traces by session:
+
+```python
+from rdk import observe
+
+@observe(name="chat", session_id="session_abc123")
+def chat(message: str) -> str:
+    # All calls in this session are linked
+    ...
+```
+
+Session IDs help you:
+- Track conversation history
+- Debug multi-turn interactions
+- Analyze user journeys
+
+## Complete Example
+
+```python
+import os
+import uuid
+from anthropic import Anthropic
+from rdk import init, observe, shutdown
+
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT"),
+    api_key=os.environ.get("RDK_API_KEY"),
+)
+
+class ChatService:
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+        self.session_id = str(uuid.uuid4())
+        self.client = Anthropic()
+
+    @observe(
+        name="chat-service",
+        tags=["production", "chat"],
+        metadata={"service": "customer-support"}
+    )
+    def chat(self, message: str) -> str:
+        response = self.client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": message}]
+        )
+        return response.content[0].text
+
+# Usage
+service = ChatService(user_id="user_123")
+response = service.chat("Hello!")
+shutdown()
+```
+
+## Dynamic Metadata
+
+For dynamic values, use the decorator with a callable:
+
+```python
+from rdk import observe
+
+def get_trace_config(request_id: str, **kwargs):
+    return {
+        "name": f"request-{request_id}",
+        "tags": ["api"],
+        "metadata": {"request_id": request_id}
+    }
+
+# Note: This pattern requires manual trace management
+# See Manual Tracing for advanced use cases
+```
+
+## Filtering Traces
+
+Metadata enables powerful filtering in your dashboard:
+
+```sql
+-- Find all traces for a specific user
+user_id = "user_123"
+
+-- Find high-priority production traces
+tags CONTAINS "production" AND tags CONTAINS "high-priority"
+
+-- Find enterprise plan requests
+metadata.plan = "enterprise"
+```
+
+## Best Practices
+
+<Tip>
+Keep metadata values simple (strings, numbers, booleans). Avoid nested objects for better queryability.
+</Tip>
+
+1. **Consistent naming** - Use a naming convention across your app
+2. **Avoid PII** - Don't put sensitive data in metadata
+3. **Limit cardinality** - High-cardinality values (like UUIDs) can impact query performance
+4. **Document your schema** - Keep a reference of your metadata fields

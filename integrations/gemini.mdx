@@ -1,0 +1,179 @@
+---
+title: Google Gemini
+description: 'Trace Google Gemini API calls automatically'
+---
+
+## Installation
+
+```bash
+pip install rdk google-generativeai
+```
+
+## Basic Usage
+
+RDK automatically instruments the Google Generative AI SDK:
+
+```python
+import os
+import google.generativeai as genai
+from rdk import init, observe, shutdown
+
+# Configure Gemini
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+
+# Initialize RDK
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT"),
+    api_key=os.environ.get("RDK_API_KEY"),
+)
+
+@observe(name="gemini-chat")
+def chat(message: str) -> str:
+    model = genai.GenerativeModel("gemini-1.5-pro")
+    response = model.generate_content(message)
+    return response.text
+
+result = chat("Explain machine learning in simple terms")
+print(result)
+
+shutdown()
+```
+
+## Async Support
+
+RDK supports async Gemini calls:
+
+```python
+import asyncio
+import google.generativeai as genai
+from rdk import init, observe, shutdown
+
+genai.configure(api_key="...")
+init(endpoint="...", api_key="...")
+
+@observe(name="async-gemini")
+async def async_chat(message: str) -> str:
+    model = genai.GenerativeModel("gemini-1.5-pro")
+    response = await model.generate_content_async(message)
+    return response.text
+
+result = asyncio.run(async_chat("Hello!"))
+shutdown()
+```
+
+## Tool Calling
+
+Gemini supports function calling:
+
+```python
+import google.generativeai as genai
+from rdk import init, observe, shutdown
+
+genai.configure(api_key="...")
+init(endpoint="...", api_key="...")
+
+# Define tools
+def get_weather(location: str) -> str:
+    """Get weather for a location."""
+    return f"Weather in {location}: 72°F, sunny"
+
+def get_time(timezone: str) -> str:
+    """Get current time in a timezone."""
+    return f"Current time in {timezone}: 2:30 PM"
+
+tools = [get_weather, get_time]
+
+@observe(name="gemini-agent")
+def agent(question: str) -> str:
+    model = genai.GenerativeModel(
+        "gemini-1.5-pro",
+        tools=tools
+    )
+
+    chat = model.start_chat()
+    response = chat.send_message(question)
+
+    # Handle function calls
+    while response.candidates[0].content.parts[0].function_call:
+        fc = response.candidates[0].content.parts[0].function_call
+
+        # Execute function
+        if fc.name == "get_weather":
+            result = get_weather(fc.args["location"])
+        elif fc.name == "get_time":
+            result = get_time(fc.args["timezone"])
+
+        response = chat.send_message(
+            genai.protos.Content(
+                parts=[genai.protos.Part(
+                    function_response=genai.protos.FunctionResponse(
+                        name=fc.name,
+                        response={"result": result}
+                    )
+                )]
+            )
+        )
+
+    return response.text
+
+result = agent("What's the weather in Tokyo?")
+shutdown()
+```
+
+## What Gets Captured
+
+For each Gemini call, RDK captures:
+
+| Field | Description |
+|-------|-------------|
+| `model` | Model name (e.g., gemini-1.5-pro) |
+| `input.contents` | Input content |
+| `output.text` | Response text |
+| `output.function_calls` | Function calls (if any) |
+| `token_usage` | Token counts (when available) |
+| `metadata.provider` | "google" |
+| `metadata.generation_config` | Generation parameters |
+
+## Supported Models
+
+RDK works with all Gemini models:
+
+- Gemini 1.5 Pro
+- Gemini 1.5 Flash
+- Gemini 1.0 Pro
+
+## Multimodal Support
+
+<Note>
+Image and video input tracing captures the content structure but not the actual media bytes.
+</Note>
+
+```python
+import google.generativeai as genai
+from rdk import init, observe, shutdown
+
+genai.configure(api_key="...")
+init(endpoint="...", api_key="...")
+
+@observe(name="vision-analysis")
+def analyze_image(image_path: str, question: str) -> str:
+    model = genai.GenerativeModel("gemini-1.5-pro")
+
+    with open(image_path, "rb") as f:
+        image_data = f.read()
+
+    response = model.generate_content([
+        question,
+        {"mime_type": "image/jpeg", "data": image_data}
+    ])
+    return response.text
+
+result = analyze_image("photo.jpg", "What's in this image?")
+shutdown()
+```
+
+## Streaming
+
+<Note>
+Streaming support is coming soon. Currently, streaming calls are passed through without tracing.
+</Note>

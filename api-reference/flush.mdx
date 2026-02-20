@@ -1,0 +1,80 @@
+---
+title: flush()
+description: 'Manually flush pending traces'
+---
+
+## Signature
+
+```python
+def flush() -> None
+```
+
+## Parameters
+
+None.
+
+## Example
+
+```python
+from rdk import init, flush
+
+init(endpoint="...", api_key="...")
+
+# Your LLM calls...
+
+# Force send all pending traces
+flush()
+```
+
+## Behavior
+
+When called, `flush()`:
+
+1. Takes all spans from the internal queue
+2. Groups them by trace ID
+3. Sends them to the collector immediately
+4. Does not wait for the batch size or flush interval
+
+## Use Cases
+
+**Debugging**: Force traces to appear in your dashboard immediately.
+
+```python
+@app.post("/debug-chat")
+@observe(name="debug")
+async def debug_chat(request: Request):
+    result = await chat(request.message)
+    flush()  # See trace immediately
+    return result
+```
+
+**Before exit**: Ensure all traces are sent before the process exits.
+
+```python
+import atexit
+from rdk import flush
+
+atexit.register(flush)
+```
+
+**Manual control**: Disable automatic flushing and control timing.
+
+```python
+init(
+    endpoint="...",
+    api_key="...",
+    flush_interval=999999,  # Effectively disable auto-flush
+)
+
+# Flush when you decide
+flush()
+```
+
+## Thread Safety
+
+`flush()` is thread-safe and can be called from any thread.
+
+## See Also
+
+- [shutdown()](/api-reference/shutdown) - Flush and cleanup
+- [init()](/api-reference/init) - Configure flush interval

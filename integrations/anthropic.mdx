@@ -1,0 +1,168 @@
+---
+title: Anthropic
+description: 'Trace Claude API calls automatically'
+---
+
+## Installation
+
+```bash
+pip install rdk anthropic
+```
+
+## Basic Usage
+
+RDK automatically instruments the Anthropic SDK when initialized:
+
+```python
+import os
+from anthropic import Anthropic
+from rdk import init, observe, shutdown
+
+# Initialize RDK
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT"),
+    api_key=os.environ.get("RDK_API_KEY"),
+)
+
+@observe(name="anthropic-chat")
+def chat(message: str) -> str:
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.content[0].text
+
+result = chat("Explain quantum computing in simple terms")
+print(result)
+
+shutdown()
+```
+
+## Async Support
+
+RDK supports async Anthropic calls:
+
+```python
+import asyncio
+from anthropic import AsyncAnthropic
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@observe(name="async-chat")
+async def async_chat(message: str) -> str:
+    client = AsyncAnthropic()
+    response = await client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.content[0].text
+
+result = asyncio.run(async_chat("Hello!"))
+shutdown()
+```
+
+## Tool Calling
+
+RDK captures tool calls and their results:
+
+```python
+from anthropic import Anthropic
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+tools = [
+    {
+        "name": "get_weather",
+        "description": "Get weather for a location",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"}
+            },
+            "required": ["location"]
+        }
+    }
+]
+
+@observe(name="weather-agent")
+def weather_agent(question: str) -> str:
+    client = Anthropic()
+    messages = [{"role": "user", "content": question}]
+
+    # First call - may request tool use
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        tools=tools,
+        messages=messages
+    )
+
+    # Handle tool calls
+    while response.stop_reason == "tool_use":
+        tool_use = next(b for b in response.content if b.type == "tool_use")
+
+        # Execute tool (mock implementation)
+        tool_result = f"Weather in {tool_use.input['location']}: 72°F, sunny"
+
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": tool_use.id,
+                "content": tool_result
+            }]
+        })
+
+        # Continue conversation
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            tools=tools,
+            messages=messages
+        )
+
+    return response.content[0].text
+
+result = weather_agent("What's the weather in San Francisco?")
+shutdown()
+```
+
+## What Gets Captured
+
+For each Anthropic call, RDK captures:
+
+| Field | Description |
+|-------|-------------|
+| `model` | Model name (e.g., claude-sonnet-4-6) |
+| `input.messages` | Input messages |
+| `input.system` | System prompt (if provided) |
+| `output.content` | Response content |
+| `output.tool_calls` | Tool use blocks (if any) |
+| `token_usage` | Prompt, completion, and total tokens |
+| `metadata.provider` | "anthropic" |
+| `metadata.max_tokens` | Max tokens parameter |
+| `metadata.temperature` | Temperature parameter |
+
+## Streaming
+
+<Note>
+Streaming support is coming soon. Currently, streaming calls are passed through without tracing.
+</Note>
+
+## Troubleshooting
+
+### Traces not appearing
+
+1. Ensure `@observe` decorator wraps your function
+2. Check that `init()` is called before any LLM calls
+3. Call `shutdown()` or `flush()` to send pending traces
+
+### Missing token usage
+
+Some API calls may not return token usage. This is normal for certain configurations.

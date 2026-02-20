@@ -1,0 +1,213 @@
+---
+title: Manual Tracing
+description: 'Create custom spans for non-LLM operations'
+---
+
+## Overview
+
+While RDK auto-instruments LLM calls, you may want to trace other operations in your application—database queries, API calls, or business logic. Manual tracing lets you create custom spans.
+
+## Creating Manual Spans
+
+```python
+from rdk import init, observe
+from rdk.models import Span, SpanType, SpanStatus
+from rdk.context import TraceContext
+
+init(endpoint="...", api_key="...")
+
+@observe(name="process-order")
+def process_order(order_id: str) -> dict:
+    trace = TraceContext.get_trace()
+
+    # Create a span for database query
+    db_span = Span(
+        trace_id=trace.id,
+        name="fetch_order",
+        type=SpanType.FUNCTION,
+        input={"order_id": order_id}
+    )
+
+    try:
+        # Your operation
+        order = database.get_order(order_id)
+
+        db_span.complete(output={"status": "found"})
+    except Exception as e:
+        db_span.fail(str(e))
+        raise
+    finally:
+        trace.spans.append(db_span)
+
+    return order
+```
+
+## Span Types
+
+Choose the appropriate type for your operation:
+
+| Type | Use Case |
+|------|----------|
+| `SpanType.LLM` | Language model calls |
+| `SpanType.CHAIN` | Orchestration/workflow logic |
+| `SpanType.TOOL` | External tool/API calls |
+| `SpanType.FUNCTION` | Internal functions/operations |
+
+## Complete Example
+
+Here's a full example with multiple manual spans:
+
+```python
+from anthropic import Anthropic
+from rdk import init, observe, shutdown
+from rdk.models import Span, SpanType
+from rdk.context import TraceContext
+
+init(endpoint="...", api_key="...")
+
+def create_span(name: str, span_type: SpanType, input_data: dict) -> Span:
+    """Helper to create spans attached to current trace."""
+    trace = TraceContext.get_trace()
+    span = Span(
+        trace_id=trace.id,
+        name=name,
+        type=span_type,
+        input=input_data
+    )
+    trace.spans.append(span)
+    return span
+
+@observe(name="customer-lookup")
+def lookup_customer(email: str) -> dict:
+    # Span for database lookup
+    db_span = create_span(
+        "database.query",
+        SpanType.FUNCTION,
+        {"query": "SELECT * FROM customers WHERE email = ?"}
+    )
+
+    try:
+        # Simulated database call
+        customer = {"id": "123", "name": "John", "email": email}
+        db_span.complete(output={"found": True, "customer_id": "123"})
+    except Exception as e:
+        db_span.fail(str(e))
+        raise
+
+    # Span for external API call
+    api_span = create_span(
+        "crm.enrich",
+        SpanType.TOOL,
+        {"customer_id": "123"}
+    )
+
+    try:
+        # Simulated API call
+        enriched = {"customer": customer, "score": 85}
+        api_span.complete(output={"score": 85})
+    except Exception as e:
+        api_span.fail(str(e))
+        raise
+
+    # Now make an LLM call (auto-traced)
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=256,
+        messages=[{
+            "role": "user",
+            "content": f"Summarize this customer: {enriched}"
+        }]
+    )
+
+    return {
+        "customer": customer,
+        "summary": response.content[0].text
+    }
+
+result = lookup_customer("john@example.com")
+shutdown()
+```
+
+## Parent-Child Relationships
+
+For nested operations, use `parent_id`:
+
+```python
+from rdk.models import Span, SpanType
+from rdk.context import TraceContext
+
+@observe(name="pipeline")
+def pipeline(data: list):
+    trace = TraceContext.get_trace()
+
+    # Parent span
+    parent = Span(
+        trace_id=trace.id,
+        name="batch_process",
+        type=SpanType.CHAIN,
+        input={"count": len(data)}
+    )
+    trace.spans.append(parent)
+
+    results = []
+    for i, item in enumerate(data):
+        # Child span
+        child = Span(
+            trace_id=trace.id,
+            parent_id=parent.id,  # Link to parent
+            name=f"process_item_{i}",
+            type=SpanType.FUNCTION,
+            input={"item": item}
+        )
+        trace.spans.append(child)
+
+        try:
+            result = process_item(item)
+            child.complete(output={"result": result})
+            results.append(result)
+        except Exception as e:
+            child.fail(str(e))
+
+    parent.complete(output={"processed": len(results)})
+    return results
+```
+
+## Timing Control
+
+Spans automatically capture start time. Control end time manually:
+
+```python
+from rdk.models import Span, SpanType, SpanStatus, _now_ms
+from rdk.context import TraceContext
+
+trace = TraceContext.get_trace()
+
+span = Span(
+    trace_id=trace.id,
+    name="long_operation",
+    type=SpanType.FUNCTION,
+    input={}
+)
+
+# Do work...
+
+# Manual completion with timing
+span.end_time = _now_ms()
+span.duration = span.end_time - span.start_time
+span.status = SpanStatus.SUCCESS
+span.output = {"result": "done"}
+
+trace.spans.append(span)
+```
+
+## Best Practices
+
+<Tip>
+Only create manual spans for operations you actually want to trace. Too many spans can make traces hard to read.
+</Tip>
+
+1. **Use descriptive names** - `database.query.customers` not `db1`
+2. **Include relevant input** - But avoid sensitive data
+3. **Always complete spans** - Use try/finally to ensure completion
+4. **Set appropriate types** - Helps with filtering and visualization

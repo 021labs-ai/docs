@@ -1,0 +1,81 @@
+---
+title: Introduction
+description: 'RDK - LLM Tracing Library for Python'
+---
+
+# RDK Python SDK
+
+RDK (Replicating Dev Kit) is a lightweight Python library for tracing LLM applications. It provides automatic instrumentation for popular LLM providers and frameworks, giving you complete visibility into your AI application's behavior.
+
+## Why RDK?
+
+Building LLM applications requires understanding what's happening under the hood. RDK helps you:
+
+- **Debug faster** - See exactly what prompts are sent and responses received
+- **Monitor costs** - Track token usage across all your LLM calls
+- **Optimize performance** - Identify slow calls and bottlenecks
+- **Ensure compliance** - Automatically redact PII from traces
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Auto-instrumentation" icon="wand-magic-sparkles">
+    Automatic tracing for Anthropic, OpenAI, LangChain, Gemini, and BAML
+  </Card>
+  <Card title="PII Redaction" icon="shield-halved">
+    Built-in redaction for emails, phone numbers, SSNs, and custom patterns
+  </Card>
+  <Card title="Minimal Overhead" icon="gauge-high">
+    Async batching with configurable flush intervals
+  </Card>
+  <Card title="Framework Agnostic" icon="puzzle-piece">
+    Works with FastAPI, Flask, or any Python application
+  </Card>
+</CardGroup>
+
+## Supported Integrations
+
+| Provider | Auto-instrumentation | Tool Calls | Streaming |
+|----------|---------------------|------------|-----------|
+| Anthropic | Yes | Yes | Coming Soon |
+| OpenAI | Yes | Yes | Coming Soon |
+| LangChain | Yes | Yes | Yes |
+| Google Gemini | Yes | Yes | Coming Soon |
+| BAML | Yes | Yes | N/A |
+
+## Quick Example
+
+```python
+from rdk import init, observe
+from anthropic import Anthropic
+
+# Initialize RDK
+init(
+    endpoint="https://collector.021labs.ai",
+    api_key="your-api-key"
+)
+
+# All LLM calls are automatically traced
+@observe(name="my-chat")
+def chat(message: str) -> str:
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.content[0].text
+
+result = chat("Hello, world!")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in 5 minutes
+  </Card>
+  <Card title="Integrations" icon="plug" href="/integrations/anthropic">
+    Set up your LLM provider
+  </Card>
+</CardGroup>

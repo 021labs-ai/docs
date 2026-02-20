@@ -1,0 +1,138 @@
+---
+title: '@observe'
+description: 'Decorator to create a trace context'
+---
+
+## Signature
+
+```python
+def observe(
+    name: str,
+    trace_id: str | None = None,
+    tags: list[str] | None = None,
+    metadata: dict | None = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
+) -> Callable
+```
+
+## Parameters
+
+<ParamField path="name" type="string" required>
+  Name for the trace. Should describe the operation being traced.
+
+  Example: `"chat-completion"`, `"customer-support"`, `"process-order"`
+</ParamField>
+
+<ParamField path="trace_id" type="string" default="auto-generated">
+  Custom trace ID. If not provided, a UUID is generated.
+
+  Use this to correlate traces across services.
+</ParamField>
+
+<ParamField path="tags" type="list[string]" default="[]">
+  Tags to attach to all spans in this trace.
+
+  Example: `["production", "high-priority"]`
+</ParamField>
+
+<ParamField path="metadata" type="dict" default="{}">
+  Custom metadata to attach to the trace.
+
+  Example: `{"order_id": "123", "plan": "enterprise"}`
+</ParamField>
+
+<ParamField path="user_id" type="string" default="None">
+  User identifier for the trace.
+
+  Useful for filtering traces by user.
+</ParamField>
+
+<ParamField path="session_id" type="string" default="None">
+  Session identifier for grouping related traces.
+
+  Useful for multi-turn conversations.
+</ParamField>
+
+## Example
+
+```python
+from rdk import observe
+
+@observe(
+    name="customer-chat",
+    tags=["production", "chat"],
+    metadata={"channel": "web"},
+    user_id="user_123",
+    session_id="session_abc"
+)
+def handle_chat(message: str) -> str:
+    # All LLM calls here are grouped into this trace
+    ...
+```
+
+## Behavior
+
+The `@observe` decorator:
+
+1. Creates a new `Trace` object with the specified parameters
+2. Sets up a trace context (using `contextvars`)
+3. Executes the decorated function
+4. All LLM calls within the function are automatically added to the trace
+
+## Sync and Async Support
+
+Works with both sync and async functions:
+
+```python
+from rdk import observe
+
+@observe(name="sync-chat")
+def sync_chat(message: str) -> str:
+    ...
+
+@observe(name="async-chat")
+async def async_chat(message: str) -> str:
+    ...
+```
+
+## Nesting
+
+Nested `@observe` decorators create separate traces:
+
+```python
+@observe(name="outer")
+def outer():
+    inner()  # Creates a separate trace
+
+@observe(name="inner")
+def inner():
+    ...
+```
+
+<Tip>
+For related operations, use a single `@observe` at the top level instead of nesting.
+</Tip>
+
+## Without Decorator
+
+If you need more control, use the trace context directly:
+
+```python
+from rdk.context import TraceContext
+from rdk.models import Trace
+
+trace = Trace(name="manual-trace")
+token = TraceContext.set_trace(trace)
+
+try:
+    # Your code here
+    ...
+finally:
+    TraceContext.reset(token)
+```
+
+## See Also
+
+- [Core Concepts](/concepts) - Understanding traces and spans
+- [Custom Metadata](/features/custom-metadata) - Adding custom data to traces

@@ -1,0 +1,185 @@
+---
+title: LangChain
+description: 'Trace LangChain chains, agents, and LLM calls'
+---
+
+## Installation
+
+```bash
+pip install rdk langchain-anthropic langchain-openai
+```
+
+## Basic Usage
+
+RDK automatically instruments LangChain when initialized:
+
+```python
+import os
+from langchain_anthropic import ChatAnthropic
+from rdk import init, observe, shutdown
+
+# Initialize RDK
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT"),
+    api_key=os.environ.get("RDK_API_KEY"),
+)
+
+@observe(name="langchain-chat")
+def chat(message: str) -> str:
+    llm = ChatAnthropic(model="claude-sonnet-4-6")
+    response = llm.invoke(message)
+    return response.content
+
+result = chat("Explain the theory of relativity")
+print(result)
+
+shutdown()
+```
+
+## Tool Calling with LangChain
+
+LangChain makes tool calling easy with the `@tool` decorator:
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.tools import tool
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@tool
+def search(query: str) -> str:
+    """Search the web for information."""
+    return f"Results for: {query}"
+
+@tool
+def calculate(expression: str) -> str:
+    """Evaluate a math expression."""
+    return str(eval(expression))
+
+tools = [search, calculate]
+tool_map = {t.name: t for t in tools}
+
+@observe(name="langchain-agent")
+def agent(question: str) -> str:
+    llm = ChatAnthropic(model="claude-sonnet-4-6")
+    llm_with_tools = llm.bind_tools(tools)
+
+    messages = [HumanMessage(content=question)]
+
+    for _ in range(5):  # Max iterations
+        response = llm_with_tools.invoke(messages)
+        messages.append(response)
+
+        if not response.tool_calls:
+            return response.content
+
+        for tc in response.tool_calls:
+            result = tool_map[tc["name"]].invoke(tc["args"])
+            messages.append(ToolMessage(
+                content=result,
+                tool_call_id=tc["id"]
+            ))
+
+    return "Max iterations reached"
+
+result = agent("What is 25 * 4 + 100?")
+shutdown()
+```
+
+## Async Support
+
+LangChain async methods are fully supported:
+
+```python
+import asyncio
+from langchain_anthropic import ChatAnthropic
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@observe(name="async-langchain")
+async def async_chat(message: str) -> str:
+    llm = ChatAnthropic(model="claude-sonnet-4-6")
+    response = await llm.ainvoke(message)
+    return response.content
+
+result = asyncio.run(async_chat("Hello!"))
+shutdown()
+```
+
+## Using with Different Providers
+
+LangChain supports multiple LLM providers:
+
+<CodeGroup>
+```python Anthropic
+from langchain_anthropic import ChatAnthropic
+
+llm = ChatAnthropic(model="claude-sonnet-4-6")
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o")
+```
+
+```python Google
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
+```
+</CodeGroup>
+
+## What Gets Captured
+
+For LangChain calls, RDK captures:
+
+| Field | Description |
+|-------|-------------|
+| `type` | CHAIN for chains, LLM for direct calls |
+| `model` | Model name |
+| `input.messages` | Input messages |
+| `output.content` | Response content |
+| `output.tool_calls` | Tool calls (if any) |
+| `token_usage` | Token usage (when available) |
+| `metadata.provider` | LLM provider name |
+
+## Chains and Agents
+
+RDK traces the full execution of LangChain chains:
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@observe(name="translation-chain")
+def translate(text: str, target_lang: str) -> str:
+    prompt = ChatPromptTemplate.from_template(
+        "Translate this to {language}: {text}"
+    )
+    llm = ChatAnthropic(model="claude-sonnet-4-6")
+    parser = StrOutputParser()
+
+    chain = prompt | llm | parser
+    return chain.invoke({"text": text, "language": target_lang})
+
+result = translate("Hello world", "French")
+shutdown()
+```
+
+## Best Practices
+
+<Tip>
+Use `@observe` at your top-level function to group all LangChain operations into a single trace.
+</Tip>
+
+1. **One trace per request** - Wrap your entry point with `@observe`
+2. **Meaningful names** - Use descriptive names for traces
+3. **Add metadata** - Include user_id and session_id for filtering

@@ -1,0 +1,143 @@
+---
+title: Quickstart
+description: 'Get started with RDK in 5 minutes'
+---
+
+## Installation
+
+Install RDK using pip or uv:
+
+<CodeGroup>
+```bash pip
+pip install rdk
+```
+
+```bash uv
+uv add rdk
+```
+</CodeGroup>
+
+## Basic Setup
+
+### 1. Initialize RDK
+
+Initialize RDK at the start of your application:
+
+```python
+from rdk import init
+
+init(
+    endpoint="https://collector.021labs.ai",
+    api_key="your-api-key",
+    batch_size=10,        # Send traces in batches of 10
+    flush_interval=5.0,   # Or every 5 seconds
+)
+```
+
+<Tip>
+Store your API key in an environment variable `RDK_API_KEY` for security.
+</Tip>
+
+### 2. Add the @observe Decorator
+
+Wrap your functions with `@observe` to create traces:
+
+```python
+from rdk import observe
+from anthropic import Anthropic
+
+@observe(name="chat-completion")
+def chat(message: str) -> str:
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.content[0].text
+```
+
+### 3. Shutdown Gracefully
+
+Flush remaining traces before your app exits:
+
+```python
+from rdk import shutdown
+
+# At app shutdown
+shutdown()
+```
+
+## Complete Example
+
+```python
+import os
+from rdk import init, observe, shutdown
+from anthropic import Anthropic
+
+# Initialize
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT", "https://collector.021labs.ai"),
+    api_key=os.environ.get("RDK_API_KEY"),
+)
+
+@observe(name="summarize")
+def summarize(text: str) -> str:
+    client = Anthropic()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=500,
+        messages=[{
+            "role": "user",
+            "content": f"Summarize this text:\n\n{text}"
+        }]
+    )
+    return response.content[0].text
+
+# Use your function
+result = summarize("Your long text here...")
+print(result)
+
+# Clean shutdown
+shutdown()
+```
+
+## Configuration Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `endpoint` | str | required | URL of your trace collector |
+| `api_key` | str | required | Your RDK API key |
+| `batch_size` | int | 10 | Number of spans per batch |
+| `flush_interval` | float | 5.0 | Seconds between auto-flushes |
+| `redactor_config` | RedactorConfig | None | PII redaction settings |
+
+## Environment Variables
+
+RDK respects these environment variables:
+
+```bash
+export RDK_ENDPOINT="https://collector.021labs.ai"
+export RDK_API_KEY="your-api-key"
+```
+
+## What Gets Traced?
+
+When you use `@observe`, RDK automatically captures:
+
+- **Input/Output** - Messages sent and received
+- **Token Usage** - Prompt, completion, and total tokens
+- **Timing** - Start time, end time, and duration
+- **Model Info** - Model name, provider, parameters
+- **Errors** - Exception messages and stack traces
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Anthropic Integration" icon="brain" href="/integrations/anthropic">
+    Set up Claude tracing
+  </Card>
+  <Card title="PII Redaction" icon="shield" href="/features/pii-redaction">
+    Protect sensitive data
+  </Card>
+</CardGroup>

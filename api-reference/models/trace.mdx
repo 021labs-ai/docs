@@ -1,0 +1,102 @@
+---
+title: Trace
+description: 'A trace containing multiple spans'
+---
+
+## Definition
+
+```python
+class Trace(CamelModel):
+    id: str
+    name: str
+    spans: list[Span]
+    start_time: int
+    end_time: int | None
+    tags: list[str]
+    metadata: dict
+    user_id: str | None
+    session_id: str | None
+```
+
+## Fields
+
+<ParamField path="id" type="string">
+  Unique identifier for the trace. Auto-generated UUID if not provided.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Name describing the operation being traced.
+</ParamField>
+
+<ParamField path="spans" type="list[Span]">
+  List of spans belonging to this trace.
+</ParamField>
+
+<ParamField path="start_time" type="integer">
+  Unix timestamp in milliseconds when the trace started.
+</ParamField>
+
+<ParamField path="end_time" type="integer">
+  Unix timestamp in milliseconds when the trace ended. `None` if still running.
+</ParamField>
+
+<ParamField path="tags" type="list[string]">
+  Tags for categorizing the trace.
+</ParamField>
+
+<ParamField path="metadata" type="dict">
+  Arbitrary metadata attached to the trace.
+</ParamField>
+
+<ParamField path="user_id" type="string">
+  Optional user identifier.
+</ParamField>
+
+<ParamField path="session_id" type="string">
+  Optional session identifier.
+</ParamField>
+
+## Example
+
+```python
+from rdk.models import Trace, Span, SpanType
+
+trace = Trace(
+    name="customer-support",
+    tags=["production"],
+    metadata={"channel": "web"},
+    user_id="user_123",
+    session_id="session_abc"
+)
+
+# Add spans
+span = Span(
+    trace_id=trace.id,
+    name="llm-call",
+    type=SpanType.LLM
+)
+trace.spans.append(span)
+```
+
+## JSON Serialization
+
+Traces serialize with camelCase field names:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "customer-support",
+  "spans": [...],
+  "startTime": 1708444800000,
+  "endTime": null,
+  "tags": ["production"],
+  "metadata": {"channel": "web"},
+  "userId": "user_123",
+  "sessionId": "session_abc"
+}
+```
+
+## See Also
+
+- [Span](/api-reference/models/span) - Individual operations
+- [Core Concepts](/concepts) - Understanding traces

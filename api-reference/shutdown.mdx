@@ -1,0 +1,108 @@
+---
+title: shutdown()
+description: 'Gracefully shutdown the RDK client'
+---
+
+## Signature
+
+```python
+def shutdown() -> None
+```
+
+## Parameters
+
+None.
+
+## Example
+
+```python
+from rdk import init, shutdown
+
+init(endpoint="...", api_key="...")
+
+# Your application code...
+
+# Clean shutdown
+shutdown()
+```
+
+## Behavior
+
+When called, `shutdown()`:
+
+1. Stops the background flush timer
+2. Flushes all pending traces
+3. Cleans up the RDK client instance
+4. Removes SDK instrumentation
+
+## Use Cases
+
+**FastAPI lifespan**:
+
+```python
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from rdk import init, shutdown
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init(endpoint="...", api_key="...")
+    yield
+    shutdown()
+
+app = FastAPI(lifespan=lifespan)
+```
+
+**Script completion**:
+
+```python
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@observe(name="main")
+def main():
+    # Your code
+    ...
+
+if __name__ == "__main__":
+    try:
+        main()
+    finally:
+        shutdown()
+```
+
+**Signal handling**:
+
+```python
+import signal
+from rdk import init, shutdown
+
+init(endpoint="...", api_key="...")
+
+def signal_handler(signum, frame):
+    shutdown()
+    exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+```
+
+## Importance
+
+<Warning>
+Always call `shutdown()` before your application exits. Otherwise, pending traces may be lost.
+</Warning>
+
+Traces are batched in memory. Without `shutdown()`:
+- Traces below the batch size won't be sent
+- Traces waiting for the flush interval won't be sent
+
+## Thread Safety
+
+`shutdown()` is thread-safe but should only be called once.
+
+## See Also
+
+- [init()](/api-reference/init) - Initialize the client
+- [flush()](/api-reference/flush) - Manual flush without shutdown

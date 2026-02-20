@@ -1,0 +1,156 @@
+---
+title: Core Concepts
+description: 'Understanding traces, spans, and how RDK works'
+---
+
+## Traces and Spans
+
+RDK uses a hierarchical tracing model based on two core concepts:
+
+### Traces
+
+A **trace** represents a complete operation in your application, such as handling a user request or processing a task. Each trace has:
+
+- A unique ID
+- A name (from your `@observe` decorator)
+- A start time and optional end time
+- A collection of spans
+- Optional metadata (tags, user_id, session_id)
+
+### Spans
+
+A **span** represents a single operation within a trace, such as an LLM call or tool execution. Each span has:
+
+- A unique ID
+- A reference to its parent trace
+- A type (LLM, CHAIN, TOOL, FUNCTION)
+- Input and output data
+- Timing information
+- Token usage (for LLM spans)
+- Status (RUNNING, SUCCESS, ERROR)
+
+```
+Trace: "customer-support-chat"
+├── Span: anthropic.messages.create (LLM)
+├── Span: search_database (TOOL)
+├── Span: anthropic.messages.create (LLM)
+└── Span: send_email (TOOL)
+```
+
+## Span Types
+
+RDK categorizes spans into four types:
+
+| Type | Description | Examples |
+|------|-------------|----------|
+| `LLM` | Language model calls | Claude, GPT-4, Gemini |
+| `CHAIN` | Orchestration logic | LangChain chains, agents |
+| `TOOL` | Tool/function execution | Database queries, API calls |
+| `FUNCTION` | Custom function spans | Your business logic |
+
+## Auto-instrumentation
+
+When you initialize RDK, it automatically patches supported LLM SDKs to capture calls:
+
+```python
+from rdk import init
+
+init(endpoint="...", api_key="...")
+# Anthropic, OpenAI, LangChain, Gemini are now instrumented
+```
+
+This means you don't need to modify your existing LLM calls. RDK intercepts them and creates spans automatically.
+
+### How It Works
+
+1. RDK patches the SDK's request methods
+2. When you call an LLM, RDK creates a span before the call
+3. The original call executes normally
+4. RDK captures the response, token usage, and timing
+5. The span is queued for batching
+
+```python
+# Your code stays the same
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    messages=[{"role": "user", "content": "Hello"}]
+)
+
+# But RDK has captured:
+# - Input messages
+# - Model and parameters
+# - Response content
+# - Token usage
+# - Duration
+```
+
+## The @observe Decorator
+
+The `@observe` decorator creates a trace context for your function:
+
+```python
+from rdk import observe
+
+@observe(name="my-operation", tags=["production"])
+def my_function(input: str) -> str:
+    # All LLM calls here are grouped into this trace
+    ...
+```
+
+### Decorator Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | str | Name for the trace |
+| `trace_id` | str | Custom trace ID (optional) |
+| `tags` | list[str] | Tags to attach to spans |
+| `metadata` | dict | Custom metadata |
+| `user_id` | str | User identifier |
+| `session_id` | str | Session identifier |
+
+## Batching and Transport
+
+RDK batches spans to reduce network overhead:
+
+```
+Spans Created → Queue → Batch (10 spans) → HTTP POST
+                    ↓
+              Flush Timer (5s) → HTTP POST
+```
+
+Configure batching with:
+
+```python
+init(
+    endpoint="...",
+    api_key="...",
+    batch_size=10,      # Max spans per batch
+    flush_interval=5.0  # Max seconds between flushes
+)
+```
+
+## Thread Safety
+
+RDK uses `contextvars` for thread-safe trace context:
+
+- Each thread/task has its own trace context
+- Async operations preserve context correctly
+- You can safely use RDK in multi-threaded applications
+
+```python
+import asyncio
+from rdk import observe
+
+@observe(name="task-1")
+async def task1():
+    # Has its own trace
+    ...
+
+@observe(name="task-2")
+async def task2():
+    # Has its own trace
+    ...
+
+# Both run with separate traces
+await asyncio.gather(task1(), task2())
+```

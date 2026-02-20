@@ -1,0 +1,168 @@
+---
+title: OpenAI
+description: 'Trace OpenAI GPT API calls automatically'
+---
+
+## Installation
+
+```bash
+pip install rdk openai
+```
+
+## Basic Usage
+
+RDK automatically instruments the OpenAI SDK when initialized:
+
+```python
+import os
+from openai import OpenAI
+from rdk import init, observe, shutdown
+
+# Initialize RDK
+init(
+    endpoint=os.environ.get("RDK_ENDPOINT"),
+    api_key=os.environ.get("RDK_API_KEY"),
+)
+
+@observe(name="openai-chat")
+def chat(message: str) -> str:
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.choices[0].message.content
+
+result = chat("Write a haiku about programming")
+print(result)
+
+shutdown()
+```
+
+## Async Support
+
+RDK supports async OpenAI calls:
+
+```python
+import asyncio
+from openai import AsyncOpenAI
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+@observe(name="async-openai")
+async def async_chat(message: str) -> str:
+    client = AsyncOpenAI()
+    response = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.choices[0].message.content
+
+result = asyncio.run(async_chat("Hello!"))
+shutdown()
+```
+
+## Tool Calling
+
+RDK captures OpenAI function/tool calls:
+
+```python
+import json
+from openai import OpenAI
+from rdk import init, observe, shutdown
+
+init(endpoint="...", api_key="...")
+
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_stock_price",
+            "description": "Get current stock price",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Stock symbol"}
+                },
+                "required": ["symbol"]
+            }
+        }
+    }
+]
+
+def get_stock_price(symbol: str) -> str:
+    # Mock implementation
+    prices = {"AAPL": 150.00, "GOOGL": 140.00, "MSFT": 380.00}
+    return json.dumps({"symbol": symbol, "price": prices.get(symbol, 0)})
+
+@observe(name="stock-agent")
+def stock_agent(question: str) -> str:
+    client = OpenAI()
+    messages = [{"role": "user", "content": question}]
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        tools=tools
+    )
+
+    # Handle tool calls
+    while response.choices[0].message.tool_calls:
+        tool_calls = response.choices[0].message.tool_calls
+        messages.append(response.choices[0].message)
+
+        for tc in tool_calls:
+            args = json.loads(tc.function.arguments)
+            result = get_stock_price(args["symbol"])
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": result
+            })
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            tools=tools
+        )
+
+    return response.choices[0].message.content
+
+result = stock_agent("What's Apple's stock price?")
+shutdown()
+```
+
+## What Gets Captured
+
+For each OpenAI call, RDK captures:
+
+| Field | Description |
+|-------|-------------|
+| `model` | Model name (e.g., gpt-4o) |
+| `input.messages` | Input messages |
+| `output.choices` | Response choices with content |
+| `output.tool_calls` | Function calls (if any) |
+| `token_usage` | Prompt, completion, and total tokens |
+| `metadata.provider` | "openai" |
+| `metadata.max_tokens` | Max tokens parameter |
+| `metadata.temperature` | Temperature parameter |
+| `metadata.top_p` | Top-p parameter |
+| `metadata.frequency_penalty` | Frequency penalty |
+| `metadata.presence_penalty` | Presence penalty |
+
+## Streaming
+
+<Note>
+Streaming support is coming soon. Currently, streaming calls are passed through without tracing.
+</Note>
+
+## Supported Models
+
+RDK works with all OpenAI chat completion models:
+
+- GPT-4o
+- GPT-4o mini
+- GPT-4 Turbo
+- GPT-4
+- GPT-3.5 Turbo
