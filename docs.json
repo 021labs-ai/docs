@@ -97,8 +97,8 @@
           "icon": "github"
         },
         {
-          "anchor": "PyPI",
-          "href": "https://pypi.org/project/rdk/",
+          "anchor": "Package",
+          "href": "https://pypi.fury.io/021labs/",
           "icon": "python"
         }
       ]
