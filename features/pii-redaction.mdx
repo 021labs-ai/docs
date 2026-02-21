@@ -16,11 +16,7 @@ Pass `redact_pii=True` to `init()` to enable default PII redaction:
 ```python
 from rdk import init
 
-init(
-    endpoint="...",
-    api_key="...",
-    redact_pii=True,
-)
+init(redact_pii=True)
 ```
 
 ### Custom redaction
@@ -44,11 +40,7 @@ redactor = create_redactor(RedactorConfig(
     ],
 ))
 
-init(
-    endpoint="...",
-    api_key="...",
-    redactor=redactor,
-)
+init(redactor=redactor)
 ```
 
 ## Built-in Patterns

@@ -18,7 +18,7 @@ None.
 ```python
 from rdk import init, shutdown
 
-init(endpoint="...", api_key="...")
+init()
 
 # Your application code...
 
@@ -46,7 +46,7 @@ from rdk import init, shutdown
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init(endpoint="...", api_key="...")
+    init()
     yield
     shutdown()
 
@@ -58,7 +58,7 @@ app = FastAPI(lifespan=lifespan)
 ```python
 from rdk import init, observe, shutdown
 
-init(endpoint="...", api_key="...")
+init()
 
 @observe(name="main")
 def main():
@@ -78,7 +78,7 @@ if __name__ == "__main__":
 import signal
 from rdk import init, shutdown
 
-init(endpoint="...", api_key="...")
+init()
 
 def signal_handler(signum, frame):
     shutdown()

@@ -19,27 +19,15 @@ uv add rdk --extra-index-url https://pypi.fury.io/021labs/
 
 ## Basic Setup
 
-### 1. Initialize RDK
+### 1. Set your API key
 
-Initialize RDK at the start of your application:
-
-```python
-import os
-from rdk import init
-
-init(
-    endpoint=os.environ["RDK_ENDPOINT"],
-    api_key=os.environ["RDK_API_KEY"],
-)
+```bash
+export RDK_API_KEY="your-api-key"
 ```
 
-<Tip>
-Store your API key in environment variables and never commit it to source control.
-</Tip>
+### 2. Add the @observe decorator
 
-### 2. Add the @observe Decorator
-
-Wrap your functions with `@observe` to create traces:
+Wrap your functions with `@observe` — RDK initializes automatically on the first call:
 
 ```python
 from rdk import observe
@@ -58,29 +46,21 @@ def chat(message: str) -> str:
 
 The `name` parameter is optional — if omitted, the function name is used.
 
-### 3. Shutdown Gracefully
+### 3. Shutdown gracefully
 
 Flush remaining traces before your app exits:
 
 ```python
 from rdk import shutdown
 
-# At app shutdown
 shutdown()
 ```
 
 ## Complete Example
 
 ```python
-import os
-from rdk import init, observe, shutdown
+from rdk import observe, shutdown
 from anthropic import Anthropic
-
-# Initialize
-init(
-    endpoint=os.environ["RDK_ENDPOINT"],
-    api_key=os.environ["RDK_API_KEY"],
-)
 
 @observe(name="summarize")
 def summarize(text: str) -> str:
@@ -88,27 +68,35 @@ def summarize(text: str) -> str:
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=500,
-        messages=[{
-            "role": "user",
-            "content": f"Summarize this text:\n\n{text}"
-        }]
+        messages=[{"role": "user", "content": f"Summarize this text:\n\n{text}"}]
     )
     return response.content[0].text
 
-# Use your function
 result = summarize("Your long text here...")
 print(result)
 
-# Clean shutdown
 shutdown()
+```
+
+## Custom Configuration
+
+Need custom settings? Call `init()` before your first `@observe` call:
+
+```python
+from rdk import init
+
+init(
+    sample_rate=0.1,  # Capture 10% of traces
+    redact_pii=True,  # Remove emails, phones, SSNs, etc.
+)
 ```
 
 ## Configuration Options
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `endpoint` | str | required | URL of your trace collector |
-| `api_key` | str | required | Your RDK API key |
+| `api_key` | str | `RDK_API_KEY` env var | Your RDK API key |
+| `endpoint` | str | `https://collector.021labs.ai` | Collector URL |
 | `batch_size` | int | 10 | Number of spans per batch |
 | `flush_interval` | float | 5.0 | Seconds between auto-flushes |
 | `timeout` | float | 30.0 | HTTP request timeout in seconds |
@@ -130,6 +118,8 @@ See [init()](/api-reference/init) for full documentation.
 
 | Variable | Effect |
 |----------|--------|
+| `RDK_API_KEY` | API key for authentication |
+| `RDK_ENDPOINT` | Override the default collector URL |
 | `RDK_TEST_MODE=1` | Equivalent to `test_mode=True` |
 
 ## What Gets Traced?
@@ -141,7 +131,7 @@ When you use `@observe`, RDK automatically captures LLM calls within the functio
 - **Model Info** — Model name and provider
 - **Errors** — Exception messages
 
-Input messages and output content are **not** captured by default. To capture them, use `capture_input=True` and `capture_output=True` on `@observe`, or enable PII-safe redaction first.
+Input messages and output content are **not** captured by default. Enable them with `capture_input=True` and `capture_output=True` on `@observe`.
 
 ## Next Steps
 

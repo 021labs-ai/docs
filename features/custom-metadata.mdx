@@ -88,15 +88,9 @@ Session IDs help you:
 ## Complete Example
 
 ```python
-import os
 import uuid
 from anthropic import Anthropic
-from rdk import init, observe, shutdown
-
-init(
-    endpoint=os.environ.get("RDK_ENDPOINT"),
-    api_key=os.environ.get("RDK_API_KEY"),
-)
+from rdk import observe, shutdown
 
 class ChatService:
     def __init__(self, user_id: str):

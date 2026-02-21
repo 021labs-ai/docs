@@ -16,16 +16,9 @@ RDK automatically instruments the Google Generative AI SDK:
 ```python
 import os
 import google.generativeai as genai
-from rdk import init, observe, shutdown
+from rdk import observe, shutdown
 
-# Configure Gemini
-genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
-
-# Initialize RDK
-init(
-    endpoint=os.environ.get("RDK_ENDPOINT"),
-    api_key=os.environ.get("RDK_API_KEY"),
-)
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 @observe(name="gemini-chat")
 def chat(message: str) -> str:
@@ -48,8 +41,7 @@ import asyncio
 import google.generativeai as genai
 from rdk import init, observe, shutdown
 
-genai.configure(api_key="...")
-init(endpoint="...", api_key="...")
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 @observe(name="async-gemini")
 async def async_chat(message: str) -> str:
@@ -69,8 +61,7 @@ Gemini supports function calling:
 import google.generativeai as genai
 from rdk import init, observe, shutdown
 
-genai.configure(api_key="...")
-init(endpoint="...", api_key="...")
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 # Define tools
 def get_weather(location: str) -> str:
@@ -152,8 +143,7 @@ Image and video input tracing captures the content structure but not the actual 
 import google.generativeai as genai
 from rdk import init, observe, shutdown
 
-genai.configure(api_key="...")
-init(endpoint="...", api_key="...")
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 @observe(name="vision-analysis")
 def analyze_image(image_path: str, question: str) -> str:

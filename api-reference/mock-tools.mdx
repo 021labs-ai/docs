@@ -46,7 +46,7 @@ Context manager that intercepts tool calls and returns mock responses instead of
 from rdk import mock_tools, observe, init
 from anthropic import Anthropic
 
-init(endpoint="...", api_key="...", test_mode=True)
+init(test_mode=True)
 
 @observe()
 def agent(question: str) -> str:
@@ -90,7 +90,7 @@ with mock_tools(default="OK"):
 When `init(test_mode=True)` is used, all tool calls return `"MOCKED"` by default. You can override specific tools with `mock_tools()`:
 
 ```python
-init(endpoint="...", api_key="...", test_mode=True)
+init(test_mode=True)
 # Default: all tools return "MOCKED"
 
 with mock_tools({"search": "Custom search result"}):
@@ -107,7 +107,7 @@ from rdk import init, mock_tools
 
 @pytest.fixture(autouse=True)
 def rdk_test_mode():
-    init(endpoint="https://placeholder", api_key="test", test_mode=True)
+    init(test_mode=True)
     yield
     from rdk import shutdown
     shutdown()

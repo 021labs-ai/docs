@@ -69,18 +69,11 @@ BAML clients are code-generated per project and cannot be auto-instrumented. You
 </Warning>
 
 ```python
-import os
 from baml_client import b
 from baml_client.types import CustomerInquiry
-from rdk import init, observe, instrument_baml, shutdown
+from rdk import observe, instrument_baml, shutdown
 
-# 1. Initialize RDK
-init(
-    endpoint=os.environ["RDK_ENDPOINT"],
-    api_key=os.environ["RDK_API_KEY"],
-)
-
-# 2. Wrap the BAML client — required for tracing
+# Wrap the BAML client — required for tracing
 b = instrument_baml(b)
 
 @observe(name="classify-inquiry")
@@ -101,14 +94,9 @@ BAML async functions are fully supported:
 
 ```python
 import asyncio
-import os
 from baml_client import b
-from rdk import init, observe, instrument_baml, shutdown
+from rdk import observe, instrument_baml, shutdown
 
-init(
-    endpoint=os.environ["RDK_ENDPOINT"],
-    api_key=os.environ["RDK_API_KEY"],
-)
 b = instrument_baml(b)
 
 @observe(name="async-classify")
@@ -148,14 +136,9 @@ function ExtractContact(text: string) -> Contact {
 ```
 
 ```python
-import os
 from baml_client import b
-from rdk import init, observe, instrument_baml, shutdown
+from rdk import observe, instrument_baml, shutdown
 
-init(
-    endpoint=os.environ["RDK_ENDPOINT"],
-    api_key=os.environ["RDK_API_KEY"],
-)
 b = instrument_baml(b)
 
 @observe(name="extract-contact")
@@ -192,12 +175,8 @@ BAML provides validation errors for malformed responses:
 ```python
 from baml_client import b
 from baml_client.errors import BamlValidationError
-from rdk import init, observe, instrument_baml, shutdown
+from rdk import observe, instrument_baml, shutdown
 
-init(
-    endpoint=os.environ["RDK_ENDPOINT"],
-    api_key=os.environ["RDK_API_KEY"],
-)
 b = instrument_baml(b)
 
 @observe(name="safe-classify")

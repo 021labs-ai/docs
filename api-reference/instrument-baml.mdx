@@ -11,10 +11,10 @@ def instrument_baml(baml_client: Any) -> Any
 
 ## Overview
 
-Unlike Anthropic, OpenAI, LangChain, and Gemini — which are auto-instrumented when `init()` is called — BAML clients are code-generated per project and cannot be monkey-patched. You must explicitly wrap the client with `instrument_baml()` after calling `init()`.
+Unlike Anthropic, OpenAI, LangChain, and Gemini — which are auto-instrumented automatically — BAML clients are code-generated per project and cannot be monkey-patched. You must explicitly wrap the client with `instrument_baml()`.
 
 <Warning>
-If you use BAML without calling `instrument_baml()`, calls will **not** be traced, even if `init()` was called. There is no error — they simply won't appear in traces.
+If you use BAML without calling `instrument_baml()`, calls will **not** be traced. There is no error — they simply won't appear in traces.
 </Warning>
 
 ## Parameters
@@ -31,14 +31,9 @@ A proxy-wrapped client with tracing enabled. Assign the result back to your clie
 
 ```python
 from baml_client import b
-from rdk import init, observe, instrument_baml
+from rdk import observe, instrument_baml
 
-init(
-    endpoint="https://collector.021labs.ai",
-    api_key="your-api-key",
-)
-
-# Required: wrap the BAML client after init()
+# Required: wrap the BAML client before use
 b = instrument_baml(b)
 
 @observe(name="extract-entities")

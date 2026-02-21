@@ -46,14 +46,8 @@ Building LLM applications requires understanding what's happening under the hood
 ## Quick Example
 
 ```python
-from rdk import init, observe
+from rdk import observe
 from anthropic import Anthropic
-
-# Initialize RDK
-init(
-    endpoint="https://collector.021labs.ai",
-    api_key="your-api-key"
-)
 
 # All LLM calls are automatically traced
 @observe(name="my-chat")
@@ -66,7 +60,7 @@ def chat(message: str) -> str:
     )
     return response.content[0].text
 
-result = chat("Hello, world!")
+result = chat("Hello, world!")  # Auto-initializes using RDK_API_KEY
 ```
 
 ## Next Steps

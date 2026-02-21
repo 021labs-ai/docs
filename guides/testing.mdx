@@ -22,11 +22,7 @@ RDK provides several mechanisms for testing LLM applications:
 ```python
 from rdk import init
 
-init(
-    endpoint="https://placeholder",
-    api_key="test",
-    test_mode=True,
-)
+init(test_mode=True)
 ```
 
 Also reads from `RDK_TEST_MODE=1` environment variable.
@@ -38,11 +34,7 @@ When you don't want any tracing at all:
 ```python
 from rdk import init
 
-init(
-    endpoint="...",
-    api_key="...",
-    enabled=False,  # init() returns None, no instrumentation occurs
-)
+init(enabled=False)  # init() returns None, no instrumentation occurs
 ```
 
 ## pytest fixture
@@ -56,11 +48,7 @@ from rdk import init, shutdown
 
 @pytest.fixture(autouse=True)
 def rdk():
-    init(
-        endpoint="https://placeholder",
-        api_key="test",
-        test_mode=True,
-    )
+    init(test_mode=True)
     yield
     shutdown()
 ```
@@ -154,7 +142,7 @@ from rdk.testing import InMemoryTransport
 
 def test_with_memory_transport():
     transport = InMemoryTransport()
-    client = init(endpoint="...", api_key="test", test_mode=True)
+    client = init(test_mode=True)
     client.set_transport(transport)
 
     chat("Hello")

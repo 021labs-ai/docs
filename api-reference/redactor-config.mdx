@@ -76,11 +76,7 @@ config = RedactorConfig(
 
 redactor = create_redactor(config)
 
-init(
-    endpoint="...",
-    api_key="...",
-    redactor=redactor,
-)
+init(redactor=redactor)
 ```
 
 ## See Also

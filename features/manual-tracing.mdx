@@ -10,10 +10,8 @@ While RDK auto-instruments LLM calls, you may want to trace other operations —
 ## Creating Manual Spans
 
 ```python
-from rdk import init, observe, span
+from rdk import observe, span
 from rdk.models import SpanType
-
-init(endpoint="...", api_key="...")
 
 @observe(name="process-order")
 def process_order(order_id: str) -> dict:
@@ -45,10 +43,8 @@ Multiple manual spans in one function:
 
 ```python
 from anthropic import Anthropic
-from rdk import init, observe, span, shutdown
+from rdk import observe, span, shutdown
 from rdk.models import SpanType
-
-init(endpoint="...", api_key="...")
 
 @observe(name="customer-lookup")
 def lookup_customer(email: str) -> dict:

@@ -50,16 +50,7 @@ RDK categorizes spans into four types:
 
 ## Auto-instrumentation
 
-When you initialize RDK, it automatically patches supported LLM SDKs to capture calls:
-
-```python
-from rdk import init
-
-init(endpoint="...", api_key="...")
-# Anthropic, OpenAI, LangChain, Gemini are now instrumented
-```
-
-This means you don't need to modify your existing LLM calls. RDK intercepts them and creates spans automatically.
+When RDK initializes (automatically on the first `@observe` call), it patches supported LLM SDKs to capture calls. This means you don't need to modify your existing LLM calls — RDK intercepts them and creates spans automatically.
 
 <Note>
 BAML is not auto-instrumented. You must call `b = instrument_baml(b)` after `init()`. See [BAML Integration](/integrations/baml).
@@ -155,8 +146,6 @@ Configure batching with:
 
 ```python
 init(
-    endpoint="...",
-    api_key="...",
     batch_size=10,      # Max spans per batch
     flush_interval=5.0  # Max seconds between flushes
 )

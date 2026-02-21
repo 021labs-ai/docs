@@ -14,15 +14,8 @@ pip install rdk openai --extra-index-url https://pypi.fury.io/021labs/
 RDK automatically instruments the OpenAI SDK when initialized:
 
 ```python
-import os
 from openai import OpenAI
-from rdk import init, observe, shutdown
-
-# Initialize RDK
-init(
-    endpoint=os.environ.get("RDK_ENDPOINT"),
-    api_key=os.environ.get("RDK_API_KEY"),
-)
+from rdk import observe, shutdown
 
 @observe(name="openai-chat")
 def chat(message: str) -> str:
@@ -46,9 +39,7 @@ RDK supports async OpenAI calls:
 ```python
 import asyncio
 from openai import AsyncOpenAI
-from rdk import init, observe, shutdown
-
-init(endpoint="...", api_key="...")
+from rdk import observe, shutdown
 
 @observe(name="async-openai")
 async def async_chat(message: str) -> str:
@@ -70,9 +61,7 @@ RDK captures OpenAI function/tool calls:
 ```python
 import json
 from openai import OpenAI
-from rdk import init, observe, shutdown
-
-init(endpoint="...", api_key="...")
+from rdk import observe, shutdown
 
 tools = [
     {

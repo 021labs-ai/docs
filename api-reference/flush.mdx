@@ -18,7 +18,7 @@ None.
 ```python
 from rdk import init, flush
 
-init(endpoint="...", api_key="...")
+init()
 
 # Your LLM calls...
 
@@ -60,11 +60,7 @@ atexit.register(flush)
 **Manual control**: Disable automatic flushing and control timing.
 
 ```python
-init(
-    endpoint="...",
-    api_key="...",
-    flush_interval=999999,  # Effectively disable auto-flush
-)
+init(flush_interval=999999)  # Effectively disable auto-flush
 
 # Flush when you decide
 flush()

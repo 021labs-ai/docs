@@ -44,9 +44,7 @@ RDK automatically captures token usage from LLM providers:
 
 ```python
 from anthropic import Anthropic
-from rdk import init, observe
-
-init(endpoint="...", api_key="...")
+from rdk import observe
 
 @observe(name="chat")
 def chat(message: str):

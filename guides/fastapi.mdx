@@ -12,24 +12,14 @@ RDK integrates seamlessly with FastAPI. This guide shows how to set up tracing i
 Use FastAPI's lifespan handler to initialize and shutdown RDK:
 
 ```python
-import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from rdk import init, shutdown
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    init(
-        endpoint=os.environ["RDK_ENDPOINT"],
-        api_key=os.environ["RDK_API_KEY"],
-        batch_size=10,
-        flush_interval=5.0,
-    )
-
-    yield  # App runs here
-
-    # Shutdown
+    init(batch_size=10, flush_interval=5.0)
+    yield
     shutdown()
 
 app = FastAPI(title="My LLM API", lifespan=lifespan)
@@ -40,7 +30,6 @@ app = FastAPI(title="My LLM API", lifespan=lifespan)
 Here's a full FastAPI application with RDK tracing:
 
 ```python
-import os
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -55,12 +44,7 @@ from rdk import flush, init, observe, shutdown
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init(
-        endpoint=os.environ["RDK_ENDPOINT"],
-        api_key=os.environ["RDK_API_KEY"],
-        batch_size=10,
-        flush_interval=5.0,
-    )
+    init(batch_size=10, flush_interval=5.0)
     yield
     shutdown()
 
@@ -215,12 +199,9 @@ async def chat_endpoint(request: ChatRequest) -> ChatResponse:
 ## Running the App
 
 ```bash
-# Set environment variables
-export RDK_ENDPOINT="https://collector.021labs.ai"
 export RDK_API_KEY="your-api-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
 
-# Run with uvicorn
 uvicorn app:app --reload
 ```
 
@@ -234,11 +215,7 @@ from rdk import init, shutdown
 
 @pytest.fixture(autouse=True)
 def rdk_test():
-    init(
-        endpoint="https://placeholder",
-        api_key="test",
-        test_mode=True,   # No HTTP calls, tool calls return "MOCKED"
-    )
+    init(test_mode=True)
     yield
     shutdown()
 ```

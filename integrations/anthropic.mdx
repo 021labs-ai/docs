@@ -14,15 +14,8 @@ pip install rdk anthropic --extra-index-url https://pypi.fury.io/021labs/
 RDK automatically instruments the Anthropic SDK when initialized:
 
 ```python
-import os
 from anthropic import Anthropic
-from rdk import init, observe, shutdown
-
-# Initialize RDK
-init(
-    endpoint=os.environ.get("RDK_ENDPOINT"),
-    api_key=os.environ.get("RDK_API_KEY"),
-)
+from rdk import observe, shutdown
 
 @observe(name="anthropic-chat")
 def chat(message: str) -> str:
@@ -47,9 +40,7 @@ RDK supports async Anthropic calls:
 ```python
 import asyncio
 from anthropic import AsyncAnthropic
-from rdk import init, observe, shutdown
-
-init(endpoint="...", api_key="...")
+from rdk import observe, shutdown
 
 @observe(name="async-chat")
 async def async_chat(message: str) -> str:
@@ -71,9 +62,7 @@ RDK captures tool calls and their results:
 
 ```python
 from anthropic import Anthropic
-from rdk import init, observe, shutdown
-
-init(endpoint="...", api_key="...")
+from rdk import observe, shutdown
 
 tools = [
     {
@@ -159,8 +148,8 @@ Streaming support is coming soon. Currently, streaming calls are passed through 
 
 ### Traces not appearing
 
-1. Ensure `@observe` decorator wraps your function
-2. Check that `init()` is called before any LLM calls
+1. Ensure `RDK_API_KEY` is set in your environment
+2. Ensure `@observe` decorator wraps your function
 3. Call `shutdown()` or `flush()` to send pending traces
 
 ### Missing token usage

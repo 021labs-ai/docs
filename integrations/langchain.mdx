@@ -14,15 +14,8 @@ pip install rdk langchain-anthropic langchain-openai --extra-index-url https://p
 RDK automatically instruments LangChain when initialized:
 
 ```python
-import os
 from langchain_anthropic import ChatAnthropic
-from rdk import init, observe, shutdown
-
-# Initialize RDK
-init(
-    endpoint=os.environ.get("RDK_ENDPOINT"),
-    api_key=os.environ.get("RDK_API_KEY"),
-)
+from rdk import observe, shutdown
 
 @observe(name="langchain-chat")
 def chat(message: str) -> str:
@@ -44,9 +37,7 @@ LangChain makes tool calling easy with the `@tool` decorator:
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_core.tools import tool
-from rdk import init, observe, shutdown
-
-init(endpoint="...", api_key="...")
+from rdk import observe, shutdown
 
 @tool
 def search(query: str) -> str:
@@ -95,9 +86,7 @@ LangChain async methods are fully supported:
 ```python
 import asyncio
 from langchain_anthropic import ChatAnthropic
-from rdk import init, observe, shutdown
-
-init(endpoint="...", api_key="...")
+from rdk import observe, shutdown
 
 @observe(name="async-langchain")
 async def async_chat(message: str) -> str:
@@ -155,9 +144,7 @@ RDK traces the full execution of LangChain chains:
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from rdk import init, observe, shutdown
-
-init(endpoint="...", api_key="...")
+from rdk import observe, shutdown
 
 @observe(name="translation-chain")
 def translate(text: str, target_lang: str) -> str:

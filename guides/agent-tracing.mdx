@@ -12,14 +12,8 @@ AI agents that use tools require special tracing consideration. This guide shows
 Here's a well-traced agent implementation:
 
 ```python
-import os
 from anthropic import Anthropic
-from rdk import init, observe, shutdown
-
-init(
-    endpoint=os.environ["RDK_ENDPOINT"],
-    api_key=os.environ["RDK_API_KEY"],
-)
+from rdk import observe, shutdown
 
 # Define tools
 tools = [

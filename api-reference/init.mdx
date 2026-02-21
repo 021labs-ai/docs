@@ -7,8 +7,8 @@ description: 'Initialize the RDK client'
 
 ```python
 def init(
-    endpoint: str,
-    api_key: str,
+    api_key: str | None = None,
+    endpoint: str | None = None,
     batch_size: int = 10,
     flush_interval: float = 5.0,
     timeout: float = 30.0,
@@ -27,18 +27,18 @@ def init(
 ) -> RDK | None
 ```
 
+<Note>
+Calling `init()` is optional. If `RDK_API_KEY` is set in your environment, RDK auto-initializes when `@observe` is first called.
+</Note>
+
 ## Parameters
 
-<ParamField path="endpoint" type="string" required>
-  The URL of your trace collector endpoint.
-
-  Example: `"https://collector.021labs.ai"`
+<ParamField path="api_key" type="string" default="RDK_API_KEY env var">
+  Your RDK API key for authentication. Falls back to the `RDK_API_KEY` environment variable if not provided.
 </ParamField>
 
-<ParamField path="api_key" type="string" required>
-  Your RDK API key for authentication.
-
-  Example: `"rdk_live_xxx..."`
+<ParamField path="endpoint" type="string" default="https://collector.021labs.ai">
+  The URL of your trace collector. Falls back to the `RDK_ENDPOINT` environment variable, then the default collector.
 </ParamField>
 
 <ParamField path="batch_size" type="integer" default={10}>
@@ -77,12 +77,10 @@ def init(
 
 <ParamField path="enabled" type="boolean" default={true}>
   If `False`, tracing is completely disabled and `init()` returns `None`. No SDK instrumentation occurs.
-
-  Useful for disabling tracing in test environments without changing other code.
 </ParamField>
 
 <ParamField path="on_error" type="Callable[[Exception], None]" default="None">
-  Callback invoked when a transport error occurs. Use this for alerting or logging.
+  Callback invoked when a transport error occurs.
 
   Example: `lambda e: logger.error(f"RDK error: {e}")`
 </ParamField>
@@ -104,7 +102,7 @@ def init(
 </ParamField>
 
 <ParamField path="transport" type="string" default="\"http\"">
-  Transport backend. `"http"` sends to the collector endpoint; `"null"` discards all spans (useful for tests).
+  Transport backend. `"http"` sends to the collector; `"null"` discards all spans (useful for tests).
 </ParamField>
 
 <ParamField path="test_mode" type="boolean" default="None">
@@ -117,18 +115,27 @@ The initialized `RDK` client instance, or `None` if `enabled=False`.
 
 ## Examples
 
-### Production
+### Zero-config
+
+Set `RDK_API_KEY` and just use `@observe` — no `init()` needed:
 
 ```python
-import os
+from rdk import observe
+
+@observe()
+def my_pipeline():
+    ...
+```
+
+### Custom config
+
+```python
 from rdk import init
 
 init(
-    endpoint=os.environ["RDK_ENDPOINT"],
-    api_key=os.environ["RDK_API_KEY"],
-    sample_rate=0.1,        # Capture 10% of traces
-    redact_pii=True,        # Remove emails, phones, SSNs, etc.
-    on_error=lambda e: logger.error(f"RDK transport error: {e}"),
+    sample_rate=0.1,
+    redact_pii=True,
+    on_error=lambda e: logger.error(f"RDK error: {e}"),
 )
 ```
 
@@ -137,12 +144,7 @@ init(
 ```python
 from rdk import init
 
-# No HTTP calls; tool calls return "MOCKED" by default
-init(
-    endpoint="https://placeholder",
-    api_key="test",
-    test_mode=True,
-)
+init(test_mode=True)  # No HTTP calls; tool calls return "MOCKED"
 ```
 
 ### Disable tracing entirely
@@ -150,32 +152,28 @@ init(
 ```python
 from rdk import init
 
-init(
-    endpoint="...",
-    api_key="...",
-    enabled=False,  # init() returns None, nothing is instrumented
-)
+init(enabled=False)
 ```
 
 ## Behavior
 
 When called, `init()`:
 
-1. Resolves `test_mode` from the argument or `RDK_TEST_MODE` env var
-2. Creates a singleton `RDK` client
-3. Starts the background flush timer
-4. Instruments the enabled LLM SDKs
+1. Resolves `api_key` from argument or `RDK_API_KEY` env var
+2. Resolves `endpoint` from argument, `RDK_ENDPOINT` env var, or default collector
+3. Resolves `test_mode` from argument or `RDK_TEST_MODE` env var
+4. Creates a singleton `RDK` client
+5. Starts the background flush timer
+6. Instruments the enabled LLM SDKs
 
 If `enabled=False`, none of the above occurs and `None` is returned.
-
-<Warning>
-Call `init()` once at application startup, before any LLM calls.
-</Warning>
 
 ## Environment Variables
 
 | Variable | Effect |
 |----------|--------|
+| `RDK_API_KEY` | API key (used when `api_key` is not passed) |
+| `RDK_ENDPOINT` | Collector URL override |
 | `RDK_TEST_MODE=1` | Equivalent to `test_mode=True` |
 
 ## See Also
