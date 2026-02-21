@@ -105,7 +105,7 @@ init(
 | `redactor` | Callable | None | Custom redaction function |
 | `debug` | bool | False | Enable verbose debug logging |
 | `enabled` | bool | True | Set to `False` to disable all tracing |
-| `test_mode` | bool | None | Use null transport + mock tools |
+| `mode` | str | `"default"` | Operating mode: `"default"`, `"test"`, or `"eval"` |
 | `on_error` | Callable | None | Callback for transport errors |
 | `instrument_langchain` | bool | True | Auto-instrument LangChain |
 | `instrument_anthropic` | bool | True | Auto-instrument Anthropic SDK |
@@ -120,7 +120,7 @@ See [init()](/api-reference/init) for full documentation.
 |----------|--------|
 | `RDK_API_KEY` | API key for authentication |
 | `RDK_ENDPOINT` | Override the default collector URL |
-| `RDK_TEST_MODE=1` | Equivalent to `test_mode=True` |
+| `RDK_MODE` | Operating mode (`default`, `test`, `eval`) |
 
 ## What Gets Traced?
 

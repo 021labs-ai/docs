@@ -207,7 +207,7 @@ uvicorn app:app --reload
 
 ## Testing
 
-Disable tracing in tests using `test_mode=True` or `enabled=False`:
+Disable tracing in tests using `mode="test"` or `enabled=False`:
 
 ```python
 import pytest
@@ -215,7 +215,7 @@ from rdk import init, shutdown
 
 @pytest.fixture(autouse=True)
 def rdk_test():
-    init(test_mode=True)
+    init(mode="test")
     yield
     shutdown()
 ```

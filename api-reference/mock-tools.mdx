@@ -35,7 +35,7 @@ Context manager that intercepts tool calls and returns mock responses instead of
 </ParamField>
 
 <ParamField path="default" type="ToolMock" default="USE_GLOBAL_DEFAULT">
-  Default mock for any tool not in `mocks`. Falls back to the process-wide default (set by `test_mode=True`).
+  Default mock for any tool not in `mocks`. Falls back to the process-wide default (set by `mode="test"`).
 </ParamField>
 
 ## Examples
@@ -46,7 +46,7 @@ Context manager that intercepts tool calls and returns mock responses instead of
 from rdk import mock_tools, observe, init
 from anthropic import Anthropic
 
-init(test_mode=True)
+init(mode="test")
 
 @observe()
 def agent(question: str) -> str:
@@ -85,12 +85,12 @@ with mock_tools(default="OK"):
     result = agent("Do anything")
 ```
 
-## test_mode and tool mocks
+## Test mode and tool mocks
 
-When `init(test_mode=True)` is used, all tool calls return `"MOCKED"` by default. You can override specific tools with `mock_tools()`:
+When `init(mode="test")` is used, all tool calls return `"MOCKED"` by default. You can override specific tools with `mock_tools()`:
 
 ```python
-init(test_mode=True)
+init(mode="test")
 # Default: all tools return "MOCKED"
 
 with mock_tools({"search": "Custom search result"}):
@@ -107,7 +107,7 @@ from rdk import init, mock_tools
 
 @pytest.fixture(autouse=True)
 def rdk_test_mode():
-    init(test_mode=True)
+    init(mode="test")
     yield
     from rdk import shutdown
     shutdown()
@@ -122,4 +122,4 @@ def test_my_agent():
 
 - [Testing Guide](/guides/testing) — Full testing patterns
 - [@observe](/api-reference/observe) — `tool_mocks` parameter on the decorator
-- [init()](/api-reference/init) — `test_mode` parameter
+- [init()](/api-reference/init) — `mode` parameter

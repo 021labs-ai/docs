@@ -7,14 +7,14 @@ description: 'Write tests for LLM applications without making real API calls'
 
 RDK provides several mechanisms for testing LLM applications:
 
-- `test_mode=True` — disables HTTP transport and mocks tool calls
+- `mode="test"` — disables HTTP transport and mocks tool calls
 - `enabled=False` — disables tracing entirely
 - `capture_traces()` — captures spans in memory for assertions
 - `mock_tools()` — intercept specific tool calls with controlled responses
 
-## test_mode
+## Test mode
 
-`test_mode=True` does two things:
+`mode="test"` does two things:
 
 1. Sets `transport="null"` — no HTTP calls are made
 2. All tool calls return `"MOCKED"` by default
@@ -22,10 +22,10 @@ RDK provides several mechanisms for testing LLM applications:
 ```python
 from rdk import init
 
-init(test_mode=True)
+init(mode="test")
 ```
 
-Also reads from `RDK_TEST_MODE=1` environment variable.
+Also reads from `RDK_MODE=test` environment variable.
 
 ## enabled=False
 
@@ -48,7 +48,7 @@ from rdk import init, shutdown
 
 @pytest.fixture(autouse=True)
 def rdk():
-    init(test_mode=True)
+    init(mode="test")
     yield
     shutdown()
 ```
@@ -142,7 +142,7 @@ from rdk.testing import InMemoryTransport
 
 def test_with_memory_transport():
     transport = InMemoryTransport()
-    client = init(test_mode=True)
+    client = init(mode="test")
     client.set_transport(transport)
 
     chat("Hello")
@@ -154,22 +154,22 @@ def test_with_memory_transport():
 
 ## Environment variable approach
 
-Set `RDK_TEST_MODE=1` in your test environment to enable test mode without changing code:
+Set `RDK_MODE=test` in your test environment to enable test mode without changing code:
 
 ```bash
 # pytest.ini or pyproject.toml
 [pytest]
 env =
-    RDK_TEST_MODE=1
+    RDK_MODE=test
 ```
 
 Or in a shell:
 
 ```bash
-RDK_TEST_MODE=1 pytest
+RDK_MODE=test pytest
 ```
 
 ## See Also
 
 - [mock_tools()](/api-reference/mock-tools) — Full API reference
-- [init()](/api-reference/init) — `test_mode` and `enabled` parameters
+- [init()](/api-reference/init) — `mode` and `enabled` parameters

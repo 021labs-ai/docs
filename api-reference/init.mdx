@@ -23,7 +23,8 @@ def init(
     instrument_openai: bool = True,
     instrument_gemini: bool = True,
     transport: str | None = None,
-    test_mode: bool | None = None,
+    mode: Literal["default", "test", "eval"] = "default",
+    eval_poll_interval: float = 5.0,
 ) -> RDK | None
 ```
 
@@ -102,11 +103,20 @@ Calling `init()` is optional. If `RDK_API_KEY` is set in your environment, RDK a
 </ParamField>
 
 <ParamField path="transport" type="string" default="\"http\"">
-  Transport backend. `"http"` sends to the collector; `"null"` discards all spans (useful for tests).
+  Transport backend. `"http"` sends to the collector; `"null"` discards all spans. Automatically set to `"null"` when `mode="test"`.
 </ParamField>
 
-<ParamField path="test_mode" type="boolean" default="None">
-  If `True`, sets `transport="null"` and configures default tool mocks. Also reads from the `RDK_TEST_MODE` environment variable (`1`, `true`, `yes`).
+<ParamField path="mode" type="string" default="\"default\"">
+  Operating mode for the RDK client:
+  - `"default"`: Normal operation with HTTP transport
+  - `"test"`: No HTTP calls, tool calls return `"MOCKED"` by default
+  - `"eval"`: Polls for active eval sessions and attaches session IDs to traces
+
+  Also reads from the `RDK_MODE` environment variable. For backwards compatibility, `RDK_TEST_MODE=1` is equivalent to `mode="test"`.
+</ParamField>
+
+<ParamField path="eval_poll_interval" type="float" default={5.0}>
+  Seconds between eval session polls when `mode="eval"`. Only used in eval mode.
 </ParamField>
 
 ## Returns
@@ -139,12 +149,21 @@ init(
 )
 ```
 
-### Testing
+### Test mode
 
 ```python
 from rdk import init
 
-init(test_mode=True)  # No HTTP calls; tool calls return "MOCKED"
+init(mode="test")  # No HTTP calls; tool calls return "MOCKED"
+```
+
+### Eval mode
+
+```python
+from rdk import init
+
+# Automatically attach eval session IDs to traces
+init(mode="eval", eval_poll_interval=5.0)
 ```
 
 ### Disable tracing entirely
@@ -161,10 +180,12 @@ When called, `init()`:
 
 1. Resolves `api_key` from argument or `RDK_API_KEY` env var
 2. Resolves `endpoint` from argument, `RDK_ENDPOINT` env var, or default collector
-3. Resolves `test_mode` from argument or `RDK_TEST_MODE` env var
+3. Resolves `mode` from argument, `RDK_MODE` env var, or `RDK_TEST_MODE` env var
 4. Creates a singleton `RDK` client
 5. Starts the background flush timer
 6. Instruments the enabled LLM SDKs
+7. If `mode="test"`, sets up default tool mocks
+8. If `mode="eval"`, starts the eval session poller thread
 
 If `enabled=False`, none of the above occurs and `None` is returned.
 
@@ -174,7 +195,7 @@ If `enabled=False`, none of the above occurs and `None` is returned.
 |----------|--------|
 | `RDK_API_KEY` | API key (used when `api_key` is not passed) |
 | `RDK_ENDPOINT` | Collector URL override |
-| `RDK_TEST_MODE=1` | Equivalent to `test_mode=True` |
+| `RDK_MODE` | Operating mode (`default`, `test`, `eval`) |
 
 ## See Also
 
