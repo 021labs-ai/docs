@@ -11,26 +11,9 @@ pip install rdk openai --extra-index-url https://pypi.fury.io/021labs/
 
 ## Basic Usage
 
-RDK automatically instruments the OpenAI SDK when initialized. Tracing works with or without `@observe`:
+RDK automatically instruments the OpenAI SDK when initialized:
 
-<CodeGroup>
-```python Without @observe
-from openai import OpenAI
-from rdk import init, shutdown
-
-init()
-
-client = OpenAI()
-response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[{"role": "user", "content": "Write a haiku about programming"}]
-)
-print(response.choices[0].message.content)
-
-shutdown()
-```
-
-```python With @observe
+```python
 from openai import OpenAI
 from rdk import observe, shutdown
 
@@ -48,11 +31,6 @@ print(result)
 
 shutdown()
 ```
-</CodeGroup>
-
-<Note>
-Without `@observe`, each API call creates its own trace. With `@observe`, all calls within the function are grouped into a single trace.
-</Note>
 
 ## Async Support
 
@@ -156,70 +134,11 @@ For each OpenAI call, RDK captures:
 | `output.tool_calls` | Function calls (if any) |
 | `token_usage` | Prompt, completion, and total tokens |
 | `metadata.provider` | "openai" |
-| `metadata.provider_request_id` | OpenAI's `x-request-id` header |
-| `metadata.cost` | Cost breakdown (total, input, output, cache) |
-| `metadata.reasoning_tokens` | Reasoning tokens (o1/o3/o4 models) |
-| `metadata.cache_read_tokens` | Tokens read from cache |
-| `metadata.system_fingerprint` | Model version fingerprint |
-| `metadata.service_tier` | Service tier (e.g., "default", "scale") |
 | `metadata.max_tokens` | Max tokens parameter |
 | `metadata.temperature` | Temperature parameter |
 | `metadata.top_p` | Top-p parameter |
 | `metadata.frequency_penalty` | Frequency penalty |
 | `metadata.presence_penalty` | Presence penalty |
-
-## Cost Tracking
-
-RDK automatically calculates costs for all OpenAI models:
-
-```json
-{
-  "cost": {
-    "total_cost": 0.000035,
-    "input_cost": 0.000010,
-    "output_cost": 0.000025,
-    "cache_read_cost": 0.0,
-    "cache_write_cost": 0.0,
-    "cache_savings": 0.0,
-    "currency": "USD"
-  }
-}
-```
-
-See [Cost Tracking](/features/cost-tracking) for supported models and pricing details.
-
-## Reasoning Tokens (o1/o3/o4 Models)
-
-For reasoning models (o1, o3, o3-mini, o4-mini), RDK captures `reasoning_tokens`:
-
-```python
-from openai import OpenAI
-from rdk import init, shutdown
-
-init()
-
-client = OpenAI()
-response = client.chat.completions.create(
-    model="o3-mini",
-    messages=[{"role": "user", "content": "Solve: 2x + 5 = 15"}]
-)
-
-shutdown()
-```
-
-The span metadata includes:
-
-```json
-{
-  "reasoning_tokens": 150,
-  "cost": {
-    "total_cost": 0.00066,
-    ...
-  }
-}
-```
-
-Reasoning tokens are included in the total token count and cost calculation.
 
 ## Streaming
 
@@ -231,11 +150,8 @@ Streaming support is coming soon. Currently, streaming calls are passed through 
 
 RDK works with all OpenAI chat completion models:
 
-- GPT-5, GPT-5 Mini, GPT-5 Nano
-- GPT-4.1, GPT-4.1 Mini, GPT-4.1 Nano
-- GPT-4o, GPT-4o Mini
-- GPT-4 Turbo, GPT-4
+- GPT-4o
+- GPT-4o mini
+- GPT-4 Turbo
+- GPT-4
 - GPT-3.5 Turbo
-- o3, o3-mini (reasoning)
-- o4-mini (reasoning)
-- o1, o1-mini (reasoning)

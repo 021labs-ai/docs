@@ -11,23 +11,9 @@ pip install rdk langchain-anthropic langchain-openai --extra-index-url https://p
 
 ## Basic Usage
 
-RDK automatically instruments LangChain when initialized. Tracing works with or without `@observe`:
+RDK automatically instruments LangChain when initialized:
 
-<CodeGroup>
-```python Without @observe
-from langchain_anthropic import ChatAnthropic
-from rdk import init, shutdown
-
-init()
-
-llm = ChatAnthropic(model="claude-sonnet-4-6")
-response = llm.invoke("Explain the theory of relativity")
-print(response.content)
-
-shutdown()
-```
-
-```python With @observe
+```python
 from langchain_anthropic import ChatAnthropic
 from rdk import observe, shutdown
 
@@ -42,11 +28,6 @@ print(result)
 
 shutdown()
 ```
-</CodeGroup>
-
-<Note>
-Without `@observe`, each `invoke()` or `ainvoke()` call creates its own trace. With `@observe`, all calls within the function are grouped into a single trace.
-</Note>
 
 ## Tool Calling with LangChain
 
@@ -154,11 +135,6 @@ For LangChain calls, RDK captures:
 | `output.tool_calls` | Tool calls (if any) |
 | `token_usage` | Token usage (when available) |
 | `metadata.provider` | LLM provider name |
-| `metadata.cost` | Cost breakdown (when using supported models) |
-
-<Tip>
-Cost tracking works automatically for LangChain calls using supported providers (Anthropic, OpenAI, Google). See [Cost Tracking](/features/cost-tracking) for details.
-</Tip>
 
 ## Chains and Agents
 
@@ -188,9 +164,9 @@ shutdown()
 ## Best Practices
 
 <Tip>
-Use `@observe` at your top-level function to group all LangChain operations into a single trace. This makes it easier to analyze multi-step workflows.
+Use `@observe` at your top-level function to group all LangChain operations into a single trace.
 </Tip>
 
-1. **Group related calls** - Use `@observe` for multi-step pipelines; skip it for simple single calls
+1. **One trace per request** - Wrap your entry point with `@observe`
 2. **Meaningful names** - Use descriptive names for traces
 3. **Add metadata** - Include user_id and session_id for filtering
