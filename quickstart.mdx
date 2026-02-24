@@ -25,11 +25,59 @@ uv add rdk --extra-index-url https://pypi.fury.io/021labs/
 export RDK_API_KEY="your-api-key"
 ```
 
-### 2. Add the @observe decorator
+### 2. Initialize and trace
 
-Wrap your functions with `@observe` — RDK initializes automatically on the first call:
+Call `init()` to start tracing — all LLM calls are captured automatically:
 
-```python
+<CodeGroup>
+```python Anthropic
+from rdk import init, shutdown
+from anthropic import Anthropic
+
+init()
+
+client = Anthropic()
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+shutdown()
+```
+
+```python OpenAI
+from rdk import init, shutdown
+from openai import OpenAI
+
+init()
+
+client = OpenAI()
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+shutdown()
+```
+
+```python Gemini
+from rdk import init, shutdown
+import google.generativeai as genai
+
+init()
+
+model = genai.GenerativeModel("gemini-1.5-pro")
+response = model.generate_content("Hello!")
+
+shutdown()
+```
+</CodeGroup>
+
+Use `@observe` to group multiple calls into a single trace:
+
+<CodeGroup>
+```python Anthropic
 from rdk import observe
 from anthropic import Anthropic
 
@@ -44,7 +92,31 @@ def chat(message: str) -> str:
     return response.content[0].text
 ```
 
-The `name` parameter is optional — if omitted, the function name is used.
+```python OpenAI
+from rdk import observe
+from openai import OpenAI
+
+@observe(name="chat-completion")
+def chat(message: str) -> str:
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.choices[0].message.content
+```
+
+```python Gemini
+from rdk import observe
+import google.generativeai as genai
+
+@observe(name="chat-completion")
+def chat(message: str) -> str:
+    model = genai.GenerativeModel("gemini-1.5-pro")
+    response = model.generate_content(message)
+    return response.text
+```
+</CodeGroup>
 
 ### 3. Shutdown gracefully
 
@@ -124,9 +196,10 @@ See [init()](/api-reference/init) for full documentation.
 
 ## What Gets Traced?
 
-When you use `@observe`, RDK automatically captures LLM calls within the function:
+RDK automatically captures all LLM calls:
 
 - **Token Usage** — Prompt, completion, and total tokens
+- **Cost** — Calculated automatically based on model pricing
 - **Timing** — Start time, end time, and duration
 - **Model Info** — Model name and provider
 - **Errors** — Exception messages
