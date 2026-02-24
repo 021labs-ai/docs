@@ -79,7 +79,7 @@ class Span(CamelModel):
 </ParamField>
 
 <ParamField path="metadata" type="dict">
-  Additional metadata (provider, parameters, etc.).
+  Additional metadata including provider info, parameters, cost, and provider-specific fields. See [Auto-captured Metadata](#auto-captured-metadata) below.
 </ParamField>
 
 <ParamField path="status" type="SpanStatus">
@@ -173,6 +173,57 @@ def my_pipeline(query: str):
 
 See [span()](/api-reference/span) for full documentation.
 
+## Auto-captured Metadata
+
+RDK automatically captures provider-specific metadata for LLM spans.
+
+### Common Fields (all providers)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `provider` | string | Provider name (`anthropic`, `openai`, `google`) |
+| `cost` | object | Cost breakdown (see below) |
+
+### Cost Object
+
+Automatically calculated for supported models:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_cost` | float | Total cost in USD |
+| `input_cost` | float | Cost of input tokens |
+| `output_cost` | float | Cost of output tokens |
+| `cache_read_cost` | float | Cost of cached token reads |
+| `cache_write_cost` | float | Cost of cache creation |
+| `cache_savings` | float | Amount saved from caching |
+| `currency` | string | Always `"USD"` |
+
+### Anthropic-specific
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `provider_request_id` | string | Anthropic's request ID for debugging |
+| `cache_read_tokens` | int | Tokens read from prompt cache |
+| `cache_creation_tokens` | int | Tokens written to prompt cache |
+
+### OpenAI-specific
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `provider_request_id` | string | OpenAI's request ID (`x-request-id` header) |
+| `reasoning_tokens` | int | Tokens used for reasoning (o1/o3/o4 models) |
+| `cache_read_tokens` | int | Tokens read from cache |
+| `system_fingerprint` | string | Model version fingerprint |
+| `service_tier` | string | Service tier used (e.g., `"default"`, `"scale"`) |
+
+### Gemini-specific
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `model_version` | string | Exact model version used |
+| `cached_content_token_count` | int | Tokens from cached content |
+| `safety_ratings` | array | Content safety ratings with category and probability |
+
 ## JSON Serialization
 
 ```json
@@ -193,7 +244,21 @@ See [span()](/api-reference/span) for full documentation.
     "completionTokens": 50,
     "totalTokens": 150
   },
-  "metadata": {"provider": "anthropic"},
+  "metadata": {
+    "provider": "anthropic",
+    "provider_request_id": "req_abc123",
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cost": {
+      "total_cost": 0.000045,
+      "input_cost": 0.000012,
+      "output_cost": 0.000033,
+      "cache_read_cost": 0.0,
+      "cache_write_cost": 0.0,
+      "cache_savings": 0.0,
+      "currency": "USD"
+    }
+  },
   "status": "SUCCESS",
   "error": null,
   "tags": ["production"]

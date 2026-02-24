@@ -50,7 +50,67 @@ RDK categorizes spans into four types:
 
 ## Auto-instrumentation
 
-When RDK initializes (automatically on the first `@observe` call), it patches supported LLM SDKs to capture calls. This means you don't need to modify your existing LLM calls — RDK intercepts them and creates spans automatically.
+RDK automatically traces all LLM calls after `init()` — no decorator required. This works in two modes:
+
+### Without @observe (auto-trace mode)
+
+Each LLM call creates its own trace:
+
+```python
+from rdk import init, shutdown
+from anthropic import Anthropic
+
+init()
+
+client = Anthropic()
+
+# Each call is a separate trace
+response1 = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=500,
+    messages=[{"role": "user", "content": "Hello"}]
+)
+
+response2 = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=500,
+    messages=[{"role": "user", "content": "Goodbye"}]
+)
+
+shutdown()
+```
+
+### With @observe (grouped mode)
+
+Multiple LLM calls are grouped into a single trace:
+
+```python
+from rdk import observe, shutdown
+from anthropic import Anthropic
+
+@observe(name="multi-step-chat")
+def chat(messages: list[str]) -> list[str]:
+    client = Anthropic()
+    responses = []
+
+    for msg in messages:
+        # Both calls belong to the same trace
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=500,
+            messages=[{"role": "user", "content": msg}]
+        )
+        responses.append(response.content[0].text)
+
+    return responses
+
+results = chat(["Hello", "Goodbye"])
+shutdown()
+```
+
+<Tip>
+Use `@observe` when you want to group related operations (e.g., a multi-turn conversation or multi-step pipeline). Skip it for simple, independent calls.
+</Tip>
 
 <Note>
 BAML is not auto-instrumented. You must call `b = instrument_baml(b)` after `init()`. See [BAML Integration](/integrations/baml).
@@ -58,11 +118,13 @@ BAML is not auto-instrumented. You must call `b = instrument_baml(b)` after `ini
 
 ### How It Works
 
-1. RDK patches the SDK's request methods
-2. When you call an LLM, RDK creates a span before the call
-3. The original call executes normally
-4. RDK captures the response, token usage, and timing
-5. The span is queued for batching
+1. RDK patches the SDK's request methods at `init()`
+2. When you call an LLM, RDK checks for an active trace context
+3. If a trace exists (from `@observe`), the span is added to it
+4. If no trace exists, RDK creates a new trace for this call
+5. The original call executes normally
+6. RDK captures response, token usage, cost, and timing
+7. The span is queued for batching
 
 ```python
 # Your code stays the same
@@ -73,14 +135,35 @@ response = client.messages.create(
 
 # But RDK has captured:
 # - Model and parameters
-# - Token usage
+# - Token usage and cost
 # - Duration
+# - Cache metrics
 # - Status
 ```
 
 ## Creating Traces
 
-### With @observe (recommended for functions)
+### Automatic (no decorator)
+
+After calling `init()`, every LLM call is traced automatically:
+
+```python
+from rdk import init, shutdown
+from openai import OpenAI
+
+init()
+
+client = OpenAI()
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello"}]
+)
+# ^ This call is automatically traced
+
+shutdown()
+```
+
+### With @observe (group multiple calls)
 
 ```python
 from rdk import observe

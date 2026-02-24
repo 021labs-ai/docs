@@ -39,6 +39,15 @@
             ]
           },
           {
+            "group": "Features",
+            "pages": [
+              "features/cost-tracking",
+              "features/custom-metadata",
+              "features/pii-redaction",
+              "features/manual-tracing"
+            ]
+          },
+          {
             "group": "Guides",
             "pages": [
               "guides/fastapi",

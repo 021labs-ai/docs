@@ -25,9 +25,31 @@ uv add rdk --extra-index-url https://pypi.fury.io/021labs/
 export RDK_API_KEY="your-api-key"
 ```
 
-### 2. Add the @observe decorator
+### 2. Initialize RDK
 
-Wrap your functions with `@observe` — RDK initializes automatically on the first call:
+The simplest way to start tracing is to call `init()`:
+
+```python
+from rdk import init, shutdown
+from anthropic import Anthropic
+
+init()
+
+client = Anthropic()
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+
+shutdown()
+```
+
+That's it. RDK automatically traces all LLM calls after `init()`.
+
+### 3. Group calls with @observe (optional)
+
+Use `@observe` to group multiple LLM calls into a single trace:
 
 ```python
 from rdk import observe
@@ -46,7 +68,11 @@ def chat(message: str) -> str:
 
 The `name` parameter is optional — if omitted, the function name is used.
 
-### 3. Shutdown gracefully
+<Note>
+Without `@observe`, each LLM call creates its own trace. With `@observe`, all calls within the function are grouped under a single trace.
+</Note>
+
+### 4. Shutdown gracefully
 
 Flush remaining traces before your app exits:
 
@@ -124,14 +150,20 @@ See [init()](/api-reference/init) for full documentation.
 
 ## What Gets Traced?
 
-When you use `@observe`, RDK automatically captures LLM calls within the function:
+RDK automatically captures every LLM call (with or without `@observe`):
 
 - **Token Usage** — Prompt, completion, and total tokens
+- **Cost** — Automatic cost calculation in USD
 - **Timing** — Start time, end time, and duration
 - **Model Info** — Model name and provider
+- **Cache Metrics** — Cache read/write tokens and savings
 - **Errors** — Exception messages
 
 Input messages and output content are **not** captured by default. Enable them with `capture_input=True` and `capture_output=True` on `@observe`.
+
+<Tip>
+Cost tracking is automatic. See [Cost Tracking](/features/cost-tracking) for details on supported models and cost fields.
+</Tip>
 
 ## Next Steps
 
