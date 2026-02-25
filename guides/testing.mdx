@@ -7,17 +7,13 @@ description: 'Write tests for LLM applications without making real API calls'
 
 RDK provides several mechanisms for testing LLM applications:
 
-- `mode="test"` — disables HTTP transport and mocks tool calls
+- `mode="test"` — disables HTTP transport (null transport)
 - `enabled=False` — disables tracing entirely
 - `capture_traces()` — captures spans in memory for assertions
-- `mock_tools()` — intercept specific tool calls with controlled responses
 
 ## Test mode
 
-`mode="test"` does two things:
-
-1. Sets `transport="null"` — no HTTP calls are made
-2. All tool calls return `"MOCKED"` by default
+`mode="test"` sets `transport="null"` — no HTTP calls are made.
 
 ```python
 from rdk import init
@@ -51,45 +47,6 @@ def rdk():
     init(mode="test")
     yield
     shutdown()
-```
-
-## mock_tools()
-
-Override specific tool responses within a test:
-
-```python
-from rdk import mock_tools, observe, init
-from anthropic import Anthropic
-
-@observe()
-def weather_agent(question: str) -> str:
-    client = Anthropic()
-    # ... tool-calling loop with "get_weather" tool
-
-def test_weather_agent():
-    with mock_tools({"get_weather": "72°F, sunny in San Francisco"}):
-        result = weather_agent("What's the weather in SF?")
-    assert "72" in result
-```
-
-### Callable mock
-
-```python
-def test_search_tool():
-    with mock_tools({
-        "search": lambda args: f"Mocked results for: {args['query']}"
-    }):
-        result = my_agent("search for python")
-    assert "python" in result
-```
-
-### Error simulation
-
-```python
-def test_tool_failure_handling():
-    with mock_tools({"search": RuntimeError("Service down")}):
-        result = my_agent("search for something")
-    assert result == "Sorry, search is unavailable"
 ```
 
 ## capture_traces()
@@ -171,5 +128,4 @@ RDK_MODE=test pytest
 
 ## See Also
 
-- [mock_tools()](/api-reference/mock-tools) — Full API reference
 - [init()](/api-reference/init) — `mode` and `enabled` parameters

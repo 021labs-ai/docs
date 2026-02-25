@@ -66,8 +66,7 @@
             "group": "Utilities",
             "pages": [
               "api-reference/get-current-trace",
-              "api-reference/instrument-baml",
-              "api-reference/mock-tools"
+              "api-reference/instrument-baml"
             ]
           },
           {

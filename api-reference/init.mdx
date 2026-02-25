@@ -109,7 +109,7 @@ Calling `init()` is optional. If `RDK_API_KEY` is set in your environment, RDK a
 <ParamField path="mode" type="string" default="\"default\"">
   Operating mode for the RDK client:
   - `"default"`: Normal operation with HTTP transport
-  - `"test"`: No HTTP calls, tool calls return `"MOCKED"` by default
+  - `"test"`: No HTTP calls (null transport)
   - `"eval"`: Polls for active eval sessions and attaches session IDs to traces
 
   Also reads from the `RDK_MODE` environment variable. For backwards compatibility, `RDK_TEST_MODE=1` is equivalent to `mode="test"`.
@@ -154,7 +154,7 @@ init(
 ```python
 from rdk import init
 
-init(mode="test")  # No HTTP calls; tool calls return "MOCKED"
+init(mode="test")  # No HTTP calls
 ```
 
 ### Eval mode
@@ -184,8 +184,7 @@ When called, `init()`:
 4. Creates a singleton `RDK` client
 5. Starts the background flush timer
 6. Instruments the enabled LLM SDKs
-7. If `mode="test"`, sets up default tool mocks
-8. If `mode="eval"`, starts the eval session poller thread
+7. If `mode="eval"`, starts the eval session poller thread
 
 If `enabled=False`, none of the above occurs and `None` is returned.
 

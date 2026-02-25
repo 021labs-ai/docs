@@ -17,8 +17,6 @@ def observe(
     trace_id: str | Callable[[], str | None] | None = None,
     capture_input: bool = False,
     capture_output: bool = False,
-    tool_mocks: ToolMocks | None = None,
-    tool_mock_default: Any = USE_GLOBAL_DEFAULT,
 ) -> Callable
 ```
 
@@ -70,16 +68,6 @@ def observe(
 
 <ParamField path="capture_output" type="boolean" default={false}>
   If `True`, serialize the function's return value and store it in `trace.metadata["output"]`.
-</ParamField>
-
-<ParamField path="tool_mocks" type="ToolMocks" default="None">
-  Mapping of tool names to mock outputs or callables. Active only within this function call.
-
-  See [mock_tools()](/api-reference/mock-tools) for details.
-</ParamField>
-
-<ParamField path="tool_mock_default" type="Any" default="USE_GLOBAL_DEFAULT">
-  Default mock response for any tool not in `tool_mocks`. Falls back to the process-wide default set by `mode="test"`.
 </ParamField>
 
 ## Examples
