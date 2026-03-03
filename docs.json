@@ -43,7 +43,8 @@
             "pages": [
               "guides/fastapi",
               "guides/agent-tracing",
-              "guides/testing"
+              "guides/testing",
+              "guides/synthetic-worlds"
             ]
           }
         ]
@@ -60,6 +61,13 @@
               "api-reference/span",
               "api-reference/flush",
               "api-reference/shutdown"
+            ]
+          },
+          {
+            "group": "Synthetic Worlds",
+            "pages": [
+              "api-reference/create-synthetic-world",
+              "api-reference/tool-spec"
             ]
           },
           {

@@ -1,0 +1,169 @@
+---
+title: ToolSpec
+description: 'JSON Schema descriptor for synthetic tools'
+---
+
+## Class
+
+```python
+class ToolSpec:
+    name: str
+    description: str
+    parameters: dict
+    returns: dict
+```
+
+## Overview
+
+`ToolSpec` describes a tool's interface as JSON Schema. It is used by `SyntheticWorld` to tell the backend what kind of response to generate.
+
+In most cases you don't create `ToolSpec` manually — the `@world.tool` decorator calls `ToolSpec.from_function()` automatically. Use `ToolSpec` directly when you need full control over the schema.
+
+## Constructor
+
+```python
+ToolSpec(
+    name: str,
+    description: str,
+    parameters: dict,
+    returns: dict,
+    param_names: list[str] | None = None,
+)
+```
+
+<ParamField path="name" type="string" required>
+  Tool name. Used as the identifier in `world.call()`.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Human-readable description of what the tool does.
+</ParamField>
+
+<ParamField path="parameters" type="dict" required>
+  JSON Schema for the tool's input parameters.
+</ParamField>
+
+<ParamField path="returns" type="dict" required>
+  JSON Schema for the tool's return value.
+</ParamField>
+
+<ParamField path="param_names" type="list[str] | None" default="None">
+  Ordered parameter names for positional argument mapping. Set automatically by `from_function()`.
+</ParamField>
+
+## Methods
+
+### `from_function(fn)`
+
+```python
+@classmethod
+def from_function(cls, fn: Callable) -> ToolSpec
+```
+
+Extracts a `ToolSpec` from a Python function using its type hints and docstring.
+
+**Type mapping:**
+
+| Python type | JSON Schema type |
+|-------------|-----------------|
+| `str` | `string` |
+| `int` | `integer` |
+| `float` | `number` |
+| `bool` | `boolean` |
+| `list` | `array` |
+| `dict` | `object` |
+
+Parameters with default values are marked as optional. Parameters without defaults are `required`.
+
+```python
+def get_user(user_id: str, include_email: bool = False) -> dict:
+    """Fetch a user by ID."""
+    ...
+
+spec = ToolSpec.from_function(get_user)
+# spec.name == "get_user"
+# spec.description == "Fetch a user by ID."
+# spec.parameters == {
+#     "type": "object",
+#     "properties": {
+#         "user_id": {"type": "string"},
+#         "include_email": {"type": "boolean"},
+#     },
+#     "required": ["user_id"],
+# }
+# spec.returns == {"type": "object"}
+```
+
+### `to_schema()`
+
+```python
+def to_schema(self) -> dict
+```
+
+Returns the full schema as a dictionary with `name`, `description`, `parameters`, and `returns` keys.
+
+### `build_input(*args, **kwargs)`
+
+```python
+def build_input(self, *args: Any, **kwargs: Any) -> dict
+```
+
+Maps positional and keyword arguments to a dictionary using the parameter names. Used internally by the `@world.tool` decorator.
+
+```python
+spec = ToolSpec.from_function(get_user)
+spec.build_input("u1", include_email=True)
+# {"user_id": "u1", "include_email": True}
+```
+
+## Examples
+
+### Manual schema
+
+```python
+from rdk.synthetic import ToolSpec
+
+spec = ToolSpec(
+    name="create_invoice",
+    description="Create an invoice for a customer",
+    parameters={
+        "type": "object",
+        "properties": {
+            "customer_id": {"type": "string"},
+            "amount": {"type": "number"},
+            "currency": {"type": "string"},
+        },
+        "required": ["customer_id", "amount"],
+    },
+    returns={
+        "type": "object",
+        "properties": {
+            "invoice_id": {"type": "string"},
+            "status": {"type": "string"},
+            "created_at": {"type": "string"},
+        },
+        "required": ["invoice_id", "status"],
+    },
+)
+
+world.register_tool(spec)
+result = world.call("create_invoice", {"customer_id": "c1", "amount": 99.99})
+```
+
+### From function
+
+```python
+from rdk.synthetic import ToolSpec
+
+def search_orders(customer_id: str, status: str = "all", limit: int = 20) -> list:
+    """Search orders by customer and optional status filter."""
+    ...
+
+spec = ToolSpec.from_function(search_orders)
+print(spec.to_schema())
+```
+
+## See Also
+
+- [create_synthetic_world()](/api-reference/create-synthetic-world) — Create a world to use tools in
+- [Synthetic Worlds Guide](/guides/synthetic-worlds) — Full usage guide

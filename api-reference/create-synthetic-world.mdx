@@ -1,0 +1,130 @@
+---
+title: create_synthetic_world()
+description: 'Create a synthetic world for simulated tool calls'
+---
+
+## Signature
+
+```python
+def create_synthetic_world(
+    project_id: str,
+    *,
+    mode: str = "schema_only",
+    seed: int | None = None,
+    model: str | None = None,
+    failure_profile: dict | None = None,
+    platform_url: str | None = None,
+    api_key: str | None = None,
+    timeout: float = 30.0,
+) -> SyntheticWorld
+```
+
+## Overview
+
+Creates a new synthetic world scoped to a project. The world intercepts tool calls and returns generated responses instead of calling real services.
+
+Returns a `SyntheticWorld` instance that can be used as a context manager. When the context exits, the world is automatically destroyed.
+
+## Parameters
+
+<ParamField path="project_id" type="string" required>
+  The project to scope the world to. Must be a project you own.
+</ParamField>
+
+<ParamField path="mode" type="string" default="schema_only">
+  Generation mode:
+
+  | Value | Description |
+  |-------|-------------|
+  | `schema_only` | Generate from tool schema alone (fastest) |
+  | `examples` | Ground generation in real examples from your traces |
+  | `stateful` | Remember prior calls within the session |
+</ParamField>
+
+<ParamField path="seed" type="int | None" default="None">
+  Seed for deterministic output. Same seed + same input = same response every time.
+</ParamField>
+
+<ParamField path="model" type="string | None" default="None">
+  LLM model for response generation. When `None`, the backend picks a default.
+</ParamField>
+
+<ParamField path="failure_profile" type="dict | None" default="None">
+  Error simulation config. When set, a percentage of calls will raise simulated errors.
+
+  ```python
+  {"rate": 0.3, "codes": ["timeout", "internal_error"]}
+  ```
+
+  Available codes: `timeout`, `internal_error`, `rate_limit`, `not_found`, `bad_request`.
+
+  Failures are deterministic when a `seed` is set.
+</ParamField>
+
+<ParamField path="platform_url" type="string | None" default="None">
+  RL platform URL. Defaults to `RDK_PLATFORM_URL` env var or `http://localhost:7878`.
+</ParamField>
+
+<ParamField path="api_key" type="string | None" default="None">
+  Bearer token for authentication. Defaults to `RDK_API_KEY` env var.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="30.0">
+  HTTP request timeout in seconds.
+</ParamField>
+
+## Returns
+
+A `SyntheticWorld` instance.
+
+## Raises
+
+- `ValueError` — if no API key is provided or found in environment
+- `httpx.HTTPStatusError` — if the backend rejects the request (auth failure, project not found)
+
+## Examples
+
+### Minimal
+
+```python
+from rdk.synthetic import create_synthetic_world
+
+with create_synthetic_world(project_id="my-project") as world:
+    @world.tool
+    def get_user(user_id: str) -> dict:
+        """Fetch a user."""
+        ...
+
+    print(get_user("u1"))
+```
+
+### With all options
+
+```python
+world = create_synthetic_world(
+    project_id="my-project",
+    mode="stateful",
+    seed=42,
+    model="gpt-4o",
+    failure_profile={"rate": 0.1, "codes": ["timeout"]},
+    platform_url="https://platform.example.com",
+    api_key="my-token",
+)
+try:
+    # use world
+    ...
+finally:
+    world.close()
+```
+
+## Environment Variables
+
+| Variable | Effect |
+|----------|--------|
+| `RDK_API_KEY` | Default API key |
+| `RDK_PLATFORM_URL` | Default platform URL |
+
+## See Also
+
+- [Synthetic Worlds Guide](/guides/synthetic-worlds) — Full usage guide
+- [ToolSpec](/api-reference/tool-spec) — Manual schema construction
